@@ -1,0 +1,95 @@
+name: SEO Audit
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # Daily at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'URL to audit'
+        required: true
+        default: 'https://www.cars24.com'
+      max_depth:
+        description: 'Max crawl depth (-1 = unlimited)'
+        required: false
+        default: '3'
+      max_pages:
+        description: 'Max pages to crawl (0 = unlimited)'
+        required: false
+        default: '500'
+      concurrency:
+        description: 'Concurrent workers'
+        required: false
+        default: '5'
+      mobile_check:
+        description: 'Enable mobile vs desktop check'
+        type: boolean
+        required: false
+        default: true
+      fail_on_errors:
+        description: 'Fail workflow if SEO errors found'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  audit:
+    name: SEO Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build
+        run: go build -o seo-audit .
+
+      - name: Determine audit URL
+        id: vars
+        run: |
+          echo "url=${{ github.event.inputs.url || 'https://www.cars24.com' }}" >> $GITHUB_OUTPUT
+          echo "max_depth=${{ github.event.inputs.max_depth || '3' }}" >> $GITHUB_OUTPUT
+          echo "max_pages=${{ github.event.inputs.max_pages || '500' }}" >> $GITHUB_OUTPUT
+          echo "concurrency=${{ github.event.inputs.concurrency || '5' }}" >> $GITHUB_OUTPUT
+
+      - name: Run SEO Audit
+        run: |
+          MOBILE_FLAG=""
+          if [[ "${{ github.event.inputs.mobile_check }}" == "false" ]]; then
+            MOBILE_FLAG="--no-mobile-check"
+          fi
+
+          ./seo-audit audit \
+            --url "${{ steps.vars.outputs.url }}" \
+            --max-depth "${{ steps.vars.outputs.max_depth }}" \
+            --max-pages "${{ steps.vars.outputs.max_pages }}" \
+            --concurrency "${{ steps.vars.outputs.concurrency }}" \
+            --format json,html,markdown \
+            --output-dir ./reports \
+            $MOBILE_FLAG
+
+      - name: Upload Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: seo-reports-${{ github.run_number }}
+          path: reports/
+          retention-days: 10
+
+      - name: Check exit thresholds
+        if: ${{ github.event.inputs.fail_on_errors == 'true' }}
+        run: |
+          ./seo-audit check-exit \
+            --report reports/report.json \
+            --max-errors 0 \
+            --max-warnings 100
