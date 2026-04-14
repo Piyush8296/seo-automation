@@ -111,7 +111,12 @@ func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 
 				pagesMu.Lock()
 				pages = append(pages, result.Page)
+				crawledCount := len(pages)
 				pagesMu.Unlock()
+
+				if c.config.OnProgress != nil {
+					c.config.OnProgress(crawledCount, ci.url)
+				}
 
 				// Enqueue discovered URLs
 				for _, discovered := range result.DiscoveredURLs {
