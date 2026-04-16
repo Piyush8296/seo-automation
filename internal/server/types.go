@@ -22,6 +22,7 @@ type StartAuditRequest struct {
 	Platform    string `json:"platform"`
 	OutputDir             string `json:"output_dir"`              // optional — overrides default storage dir
 	ValidateExternalLinks bool   `json:"validate_external_links"` // opt-in external link validation
+	DiscoverResources     bool   `json:"discover_resources"`      // opt-in CSS/JS/font sub-resource discovery
 }
 
 // AuditRecord is the persistent metadata for one audit run, stored as meta.json.

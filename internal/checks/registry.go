@@ -154,6 +154,22 @@ func init() {
 	}
 }
 
+// Catalog describes the registered check surface for introspection via API.
+type Catalog struct {
+	Total      int `json:"total"`
+	PageChecks int `json:"page_checks"`
+	SiteChecks int `json:"site_checks"`
+}
+
+// GetCatalog returns the count of registered check runners.
+func GetCatalog() Catalog {
+	return Catalog{
+		Total:      len(pageChecks) + len(siteChecks),
+		PageChecks: len(pageChecks),
+		SiteChecks: len(siteChecks),
+	}
+}
+
 // RunPageChecks runs all per-page checks and returns combined results.
 func RunPageChecks(page *models.PageData) []models.CheckResult {
 	var results []models.CheckResult

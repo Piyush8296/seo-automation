@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/cars24/seo-automation/internal/checks"
 )
 
 // Handlers holds references to all service-layer dependencies.
@@ -149,6 +151,12 @@ func (h *Handlers) serveReportHTML(w http.ResponseWriter, r *http.Request, id st
 
 func (h *Handlers) serveReportJSON(w http.ResponseWriter, r *http.Request, id string) {
 	http.ServeFile(w, r, h.storage.ReportPath(id, "json"))
+}
+
+// ── GET /api/checks ──────────────────────────────────────────────────────────
+
+func (h *Handlers) listChecks(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, checks.GetCatalog())
 }
 
 // ── GET /api/audits/diff?a={id}&b={id} ───────────────────────────────────────

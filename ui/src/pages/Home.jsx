@@ -9,6 +9,7 @@ export default function Home() {
   const [audits, setAudits] = useState([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [starting, setStarting] = useState(false)
+  const [checkCount, setCheckCount] = useState(null)
   const navigate = useNavigate()
 
   const fetchAudits = useCallback(async () => {
@@ -23,6 +24,12 @@ export default function Home() {
   }, [])
 
   useEffect(() => { fetchAudits() }, [fetchAudits])
+
+  useEffect(() => {
+    api.getCheckCatalog()
+      .then((c) => setCheckCount(c?.total ?? null))
+      .catch((e) => console.error('Failed to load check catalog:', e))
+  }, [])
 
   // Auto-refresh while any audit is still running
   useEffect(() => {
@@ -61,7 +68,7 @@ export default function Home() {
             <span className="text-xl">🔍</span>
             <span className="font-bold text-gray-100 tracking-tight">SEO Audit</span>
             <span className="hidden sm:inline text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-              175+ checks
+              {checkCount !== null ? `${checkCount} checks` : '… checks'}
             </span>
           </div>
           <button

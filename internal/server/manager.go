@@ -125,6 +125,7 @@ func (m *Manager) runAudit(ctx context.Context, id string, req StartAuditRequest
 		MobileUA:      defaultMobileUA,
 		Platform:              platform,
 		ValidateExternalLinks: req.ValidateExternalLinks,
+		DiscoverResources:     req.DiscoverResources,
 		OnProgress: func(crawled int, currentURL string) {
 			m.hub.Broadcast(id, ProgressEvent{
 				Type:         "progress",

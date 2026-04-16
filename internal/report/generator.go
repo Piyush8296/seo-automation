@@ -23,12 +23,19 @@ func gradeFor(score float64) string {
 	}
 }
 
-func scoreFromStats(s models.AuditStats) float64 {
-	if s.TotalChecksRun == 0 {
+// scoreFromStats returns a 0–100 health score from weighted issue density per page.
+// Uses log-decay so issue-dense sites still gradate instead of flooring to 0.
+// Calibration (weighted issues per page → score):
+//   0 → 100 (A) · 2 → 90 (A) · 10 → 79 (C) · 30 → 70 (C) · 100 → 60 (D) · 1000 → 40 (F).
+// Errors count 3×, warnings 1×, notices 0.3×.
+func scoreFromStats(s models.AuditStats, pageCount int) float64 {
+	if pageCount <= 0 {
 		return 100
 	}
-	penalty := float64(s.Errors*10+s.Warnings*3+s.Notices*1) * 100.0 / float64(s.TotalChecksRun)
-	return math.Round(math.Max(0, math.Min(100, 100-penalty))*10) / 10
+	weighted := float64(s.Errors*3+s.Warnings) + float64(s.Notices)*0.3
+	perPage := weighted / float64(pageCount)
+	score := 100 - 20*math.Log10(1+perPage)
+	return math.Round(math.Max(0, math.Min(100, score))*10) / 10
 }
 
 // ComputeHealthScore calculates the overall, desktop, and mobile health scores.
@@ -74,13 +81,15 @@ func ComputeHealthScore(audit *models.SiteAudit) {
 	audit.DesktopStats = desktop
 	audit.MobileStats = mobile
 
-	audit.HealthScore = scoreFromStats(all)
+	pageCount := len(audit.Pages)
+
+	audit.HealthScore = scoreFromStats(all, pageCount)
 	audit.Grade = gradeFor(audit.HealthScore)
 
-	audit.DesktopHealthScore = scoreFromStats(desktop)
+	audit.DesktopHealthScore = scoreFromStats(desktop, pageCount)
 	audit.DesktopGrade = gradeFor(audit.DesktopHealthScore)
 
-	audit.MobileHealthScore = scoreFromStats(mobile)
+	audit.MobileHealthScore = scoreFromStats(mobile, pageCount)
 	audit.MobileGrade = gradeFor(audit.MobileHealthScore)
 }
 
