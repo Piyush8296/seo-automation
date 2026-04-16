@@ -24,6 +24,7 @@ func ExtractPage(body []byte, pageURL string, headers map[string]string) (*model
 
 	// Meta
 	page.Title, page.MetaDesc, page.Canonical, page.RobotsTag, page.ViewportContent, page.HasViewport = ExtractMeta(doc)
+	page.RobotsDirectives, page.XRobotsTag = ParseRobotsDirectives(page.RobotsTag, headers)
 
 	// OG / Twitter / hreflang
 	page.OGTags = ExtractOGTags(doc)

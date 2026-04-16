@@ -96,6 +96,8 @@ type PageData struct {
 	H3s                   []string          `json:"h3s"`
 	Canonical             string            `json:"canonical"`
 	RobotsTag             string            `json:"robots_tag"`
+	RobotsDirectives      []string          `json:"robots_directives,omitempty"`
+	XRobotsTag            string            `json:"x_robots_tag,omitempty"`
 	RedirectChain         []RedirectHop     `json:"redirect_chain,omitempty"`
 	Links                 []Link            `json:"links"`
 	Images                []Image           `json:"images"`
