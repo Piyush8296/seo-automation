@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,13 +11,15 @@ import (
 
 // Server wires together storage, the hub, the manager, and the HTTP mux.
 type Server struct {
-	h    *Handlers
-	addr string
+	h     *Handlers
+	addr  string
+	uiDir string // path to the built frontend (ui/dist)
 }
 
 // New creates a Server ready to serve.
 // baseDir is where audit reports are stored; defaults to ~/.seo-reports when empty.
-func New(baseDir string) (*Server, error) {
+// uiDir is the path to the built frontend assets (e.g. "ui/dist"); leave empty to disable UI serving.
+func New(baseDir, uiDir string) (*Server, error) {
 	if baseDir == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -34,7 +37,7 @@ func New(baseDir string) (*Server, error) {
 	manager := NewManager(storage, hub)
 	handlers := newHandlers(manager, storage, hub)
 
-	return &Server{h: handlers}, nil
+	return &Server{h: handlers, uiDir: uiDir}, nil
 }
 
 // Handler builds and returns the HTTP mux.
@@ -102,6 +105,25 @@ func (s *Server) Handler() http.Handler {
 			http.NotFound(w, r)
 		}
 	})
+
+	// Serve the React UI for all non-API routes (SPA fallback).
+	if s.uiDir != "" {
+		uiFS := http.Dir(s.uiDir)
+		fileServer := http.FileServer(uiFS)
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			// Try to serve the exact file (JS, CSS, images, etc.)
+			p := strings.TrimPrefix(r.URL.Path, "/")
+			if p == "" {
+				p = "index.html"
+			}
+			if _, err := fs.Stat(os.DirFS(s.uiDir), p); err == nil {
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+			// Fall back to index.html for client-side routing
+			http.ServeFile(w, r, filepath.Join(s.uiDir, "index.html"))
+		})
+	}
 
 	return corsMiddleware(mux)
 }

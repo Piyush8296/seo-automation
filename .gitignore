@@ -1,0 +1,12 @@
+# Go
+seo-audit
+
+# Frontend
+ui/node_modules/
+ui/dist/
+
+# Reports
+reports/
+
+# OS
+.DS_Store
