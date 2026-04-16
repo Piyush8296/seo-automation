@@ -44,6 +44,7 @@ func ProcessURL(
 	page.ResponseTimeMs = result.ResponseTimeMs
 	page.RedirectChain = result.RedirectChain
 	page.HTMLSizeBytes = len(result.Body)
+	page.TLSInfo = result.TLSInfo
 
 	if result.Error != "" {
 		page.Error = result.Error

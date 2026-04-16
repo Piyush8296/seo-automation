@@ -123,6 +123,20 @@ type PageData struct {
 	ViewportContent       string            `json:"viewport_content"`
 	// Mobile comparison data
 	MobileData            *MobilePageData   `json:"mobile_data,omitempty"`
+	// TLS / SSL certificate info
+	TLSInfo               *TLSInfo          `json:"tls_info,omitempty"`
+}
+
+// TLSInfo holds TLS connection and certificate details captured during fetch.
+type TLSInfo struct {
+	Version       string    `json:"version"`                  // e.g. "TLS 1.3"
+	CipherSuite   string    `json:"cipher_suite"`
+	CertSubject   string    `json:"cert_subject,omitempty"`
+	CertIssuer    string    `json:"cert_issuer,omitempty"`
+	CertNotBefore time.Time `json:"cert_not_before,omitempty"`
+	CertNotAfter  time.Time `json:"cert_not_after,omitempty"`
+	CertDNSNames  []string  `json:"cert_dns_names,omitempty"`
+	ChainLength   int       `json:"chain_length"`
 }
 
 // MobilePageData holds data fetched with a mobile user-agent for comparison

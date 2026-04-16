@@ -21,6 +21,7 @@ import (
 	"github.com/cars24/seo-automation/internal/checks/performance"
 	"github.com/cars24/seo-automation/internal/checks/sitemapcheck"
 	"github.com/cars24/seo-automation/internal/checks/social"
+	"github.com/cars24/seo-automation/internal/checks/ssl"
 	"github.com/cars24/seo-automation/internal/checks/structured_data"
 	"github.com/cars24/seo-automation/internal/checks/url_structure"
 	"github.com/cars24/seo-automation/internal/models"
@@ -99,6 +100,9 @@ func init() {
 		pageChecks = append(pageChecks, c)
 	}
 	for _, c := range eeat.PageChecks() {
+		pageChecks = append(pageChecks, c)
+	}
+	for _, c := range ssl.PageChecks() {
 		pageChecks = append(pageChecks, c)
 	}
 
