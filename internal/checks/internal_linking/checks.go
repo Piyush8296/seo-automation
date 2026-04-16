@@ -29,6 +29,7 @@ func PageChecks() []models.PageCheck {
 func SiteChecks() []models.SiteCheck {
 	return []models.SiteCheck{
 		&orphanPage{},
+		&lowInlinks{},
 	}
 }
 
@@ -172,9 +173,9 @@ func (c *tooManyOutlinks) Run(p *models.PageData) []models.CheckResult {
 
 // Site-wide checks
 
-type orphanPage struct{}
-
-func (o *orphanPage) Run(pages []*models.PageData) []models.CheckResult {
+// buildInlinkMap counts how many internal links point to each URL and populates
+// the InlinkCount field on every PageData.
+func buildInlinkMap(pages []*models.PageData) map[string]int {
 	inlinks := map[string]int{}
 	for _, p := range pages {
 		for _, link := range p.Links {
@@ -183,6 +184,21 @@ func (o *orphanPage) Run(pages []*models.PageData) []models.CheckResult {
 			}
 		}
 	}
+	// Populate InlinkCount on each page for report output
+	for _, p := range pages {
+		count := inlinks[p.URL]
+		if p.FinalURL != "" && p.FinalURL != p.URL {
+			count += inlinks[p.FinalURL]
+		}
+		p.InlinkCount = count
+	}
+	return inlinks
+}
+
+type orphanPage struct{}
+
+func (o *orphanPage) Run(pages []*models.PageData) []models.CheckResult {
+	inlinks := buildInlinkMap(pages)
 	var results []models.CheckResult
 	for _, p := range pages {
 		if p.Depth == 0 {
@@ -194,6 +210,32 @@ func (o *orphanPage) Run(pages []*models.PageData) []models.CheckResult {
 				Category: "Internal Linking",
 				Severity: models.SeverityWarning,
 				Message:  "Page has no internal inlinks (orphan)",
+				URL:      p.URL,
+			})
+		}
+	}
+	return results
+}
+
+type lowInlinks struct{}
+
+func (l *lowInlinks) Run(pages []*models.PageData) []models.CheckResult {
+	inlinks := buildInlinkMap(pages)
+	var results []models.CheckResult
+	for _, p := range pages {
+		if p.Depth == 0 {
+			continue // skip seed URL
+		}
+		count := inlinks[p.URL]
+		if p.FinalURL != "" && p.FinalURL != p.URL {
+			count += inlinks[p.FinalURL]
+		}
+		if count > 0 && count < 3 {
+			results = append(results, models.CheckResult{
+				ID:       "links.page.low_inlinks",
+				Category: "Internal Linking",
+				Severity: models.SeverityWarning,
+				Message:  fmt.Sprintf("Page has very few internal inlinks (%d, recommend 3+)", count),
 				URL:      p.URL,
 			})
 		}

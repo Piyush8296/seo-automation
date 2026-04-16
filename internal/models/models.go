@@ -109,6 +109,7 @@ type PageData struct {
 	TwitterTags           map[string]string `json:"twitter_tags"`
 	HreflangTags          []Hreflang        `json:"hreflang_tags"`
 	Depth                 int               `json:"depth"`
+	InlinkCount           int               `json:"inlink_count"`
 	IsInternal            bool              `json:"is_internal"`
 	InSitemap             bool              `json:"in_sitemap"`
 	CheckResults          []CheckResult     `json:"check_results"`
