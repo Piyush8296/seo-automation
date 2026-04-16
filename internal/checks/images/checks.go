@@ -19,6 +19,10 @@ func PageChecks() []models.PageCheck {
 		&imageDimensionsMissing{},
 		&imageLazyAboveFold{},
 		&imageMissingSrcset{},
+		&imageFormatNotModern{},
+		&imageSizeTooLarge{},
+		&imageBroken{},
+		&imageNoWidthHeightCLS{},
 	}
 }
 
@@ -179,4 +183,109 @@ func (c *imageMissingSrcset) Run(p *models.PageData) []models.CheckResult {
 		}}
 	}
 	return nil
+}
+
+// modernFormats are image formats considered modern/optimal for web.
+var modernFormats = map[string]bool{
+	"webp": true,
+	"avif": true,
+	"svg":  true,
+}
+
+// ── images.format.not_modern ──────────────────────────────────────────────────
+
+type imageFormatNotModern struct{}
+
+func (c *imageFormatNotModern) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, img := range p.Images {
+		if img.Format == "" || modernFormats[img.Format] {
+			continue
+		}
+		results = append(results, models.CheckResult{
+			ID:       "images.format.not_modern",
+			Category: "Images",
+			Severity: models.SeverityNotice,
+			Message:  fmt.Sprintf("Image not in modern format (current: %s, recommend WebP/AVIF)", img.Format),
+			URL:      p.URL,
+			Details:  img.Src,
+		})
+	}
+	return results
+}
+
+// ── images.size.too_large ─────────────────────────────────────────────────────
+
+const maxImageBytes = 200 * 1024 // 200 KB
+
+type imageSizeTooLarge struct{}
+
+func (c *imageSizeTooLarge) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, img := range p.Images {
+		if img.FileSize <= 0 {
+			continue
+		}
+		if img.FileSize > maxImageBytes {
+			sizeKB := img.FileSize / 1024
+			results = append(results, models.CheckResult{
+				ID:       "images.size.too_large",
+				Category: "Images",
+				Severity: models.SeverityWarning,
+				Message:  fmt.Sprintf("Image file too large (%d KB, max 200 KB)", sizeKB),
+				URL:      p.URL,
+				Details:  img.Src,
+			})
+		}
+	}
+	return results
+}
+
+// ── images.broken ─────────────────────────────────────────────────────────────
+
+type imageBroken struct{}
+
+func (c *imageBroken) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, img := range p.Images {
+		if img.StatusCode == 0 {
+			// No response or network error — skip (could be data URI, relative, etc.)
+			continue
+		}
+		if img.StatusCode >= 400 {
+			results = append(results, models.CheckResult{
+				ID:       "images.broken",
+				Category: "Images",
+				Severity: models.SeverityError,
+				Message:  fmt.Sprintf("Broken image (HTTP %d)", img.StatusCode),
+				URL:      p.URL,
+				Details:  img.Src,
+			})
+		}
+	}
+	return results
+}
+
+// ── images.no_width_height_cls ────────────────────────────────────────────────
+
+type imageNoWidthHeightCLS struct{}
+
+func (c *imageNoWidthHeightCLS) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, img := range p.Images {
+		if !img.IsAboveFold {
+			continue
+		}
+		if img.Width == 0 || img.Height == 0 {
+			results = append(results, models.CheckResult{
+				ID:       "images.no_width_height_cls",
+				Category: "Images",
+				Severity: models.SeverityWarning,
+				Message:  "Above-fold image missing explicit width/height (CLS risk)",
+				URL:      p.URL,
+				Details:  img.Src,
+			})
+		}
+	}
+	return results
 }

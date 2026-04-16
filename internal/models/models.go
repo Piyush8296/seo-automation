@@ -67,6 +67,9 @@ type Image struct {
 	HasSrcset   bool   `json:"has_srcset"`
 	IsAboveFold bool   `json:"is_above_fold"`
 	StatusCode  int    `json:"status_code,omitempty"`
+	FileSize    int64  `json:"file_size,omitempty"`    // bytes, from HEAD/GET response
+	Format      string `json:"format,omitempty"`       // e.g. "jpg", "webp", "avif", "png"
+	ContentType string `json:"content_type,omitempty"` // from Content-Type header
 }
 
 // Hreflang represents an alternate language link

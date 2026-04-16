@@ -138,6 +138,7 @@ func extractImages(doc *goquery.Document, baseURL string) []models.Image {
 			Height:     height,
 			Loading:    loading,
 			HasSrcset:  hasSrcset,
+			Format:     imageFormatFromURL(abs),
 			// Mark first 3 images as potential above-fold candidates
 			IsAboveFold: idx < 3,
 		}
@@ -160,4 +161,24 @@ func parseIntAttr(s string) int {
 		}
 	}
 	return n
+}
+
+// imageFormatFromURL extracts the image format from a URL's file extension.
+func imageFormatFromURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	path := strings.ToLower(parsed.Path)
+	// Strip query/fragment already handled by url.Parse
+	if idx := strings.LastIndex(path, "."); idx != -1 {
+		ext := path[idx+1:]
+		switch ext {
+		case "jpg", "jpeg":
+			return "jpg"
+		case "png", "gif", "webp", "avif", "svg", "bmp", "ico", "tiff", "tif":
+			return ext
+		}
+	}
+	return ""
 }

@@ -100,6 +100,9 @@ func ProcessURL(
 	page.HasViewport = extracted.HasViewport
 	page.ViewportContent = extracted.ViewportContent
 
+	// Validate images (HEAD requests for file size, content-type, broken detection)
+	ValidateImages(ctx, page.Images, config.UserAgent)
+
 	// Collect discovered internal URLs
 	var discovered []string
 	for _, link := range page.Links {
