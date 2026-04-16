@@ -1,0 +1,23 @@
+# Build artefacts
+seo-audit
+*.exe
+
+# Reports generated during dev
+reports/
+
+# Git
+.git
+.gitignore
+
+# Claude worktrees and project files
+.claude/
+
+# Docs / samples
+*.md
+*.pdf
+PLAN.md
+README.md
+SKILL.md
+
+# OS
+.DS_Store

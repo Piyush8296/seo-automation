@@ -24,4 +24,5 @@ func init() {
 	rootCmd.AddCommand(auditCmd)
 	rootCmd.AddCommand(diffCmd)
 	rootCmd.AddCommand(checkExitCmd)
+	rootCmd.AddCommand(serverCmd)
 }

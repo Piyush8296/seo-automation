@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  seo-audit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: seo-audit:local
+    restart: unless-stopped
+    command: ["--port", "8080", "--reports-dir", "/data/reports", "--ui-dir", "/ui/dist"]
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - reports:/data/reports
+
+volumes:
+  reports:
+    driver: local

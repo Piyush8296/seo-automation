@@ -185,4 +185,8 @@ type CrawlConfig struct {
 	// "desktop" = skip mobile fetch, only surface desktop issues.
 	// "mobile"  = only surface mobile + diff issues.
 	Platform Platform
+	// OnProgress is called after each page is successfully crawled.
+	// crawled = total pages done so far; currentURL = the URL just processed.
+	// Safe to leave nil.
+	OnProgress func(crawled int, currentURL string)
 }
