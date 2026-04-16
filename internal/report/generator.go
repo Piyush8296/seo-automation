@@ -27,7 +27,7 @@ func scoreFromStats(s models.AuditStats) float64 {
 	if s.TotalChecksRun == 0 {
 		return 100
 	}
-	penalty := float64(s.Errors*10+s.Warnings*3+s.Notices*1) * 100.0 / float64(s.TotalChecksRun)
+	penalty := float64(s.Errors*10+s.Warnings*3+s.Notices*1) * 10.0 / float64(s.TotalChecksRun)
 	return math.Round(math.Max(0, math.Min(100, 100-penalty))*10) / 10
 }
 
