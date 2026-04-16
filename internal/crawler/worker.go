@@ -86,6 +86,8 @@ func ProcessURL(
 	page.H3s = extracted.H3s
 	page.Links = extracted.Links
 	page.Images = extracted.Images
+	page.Resources = extracted.Resources
+	page.FontFaceNoDisplay = extracted.FontFaceNoDisplay
 	page.SchemaJSONRaw = extracted.SchemaJSONRaw
 	page.OGTags = extracted.OGTags
 	page.TwitterTags = extracted.TwitterTags

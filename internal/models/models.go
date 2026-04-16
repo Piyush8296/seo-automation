@@ -57,6 +57,25 @@ type Link struct {
 	Timeout    bool   `json:"timeout,omitempty"`
 }
 
+// ResourceType classifies a sub-resource discovered on a page.
+type ResourceType string
+
+const (
+	ResourceScript ResourceType = "script"
+	ResourceCSS    ResourceType = "css"
+	ResourceFont   ResourceType = "font"
+)
+
+// Resource represents a sub-resource (CSS, JS, or font) referenced by a page.
+type Resource struct {
+	URL         string       `json:"url"`
+	Type        ResourceType `json:"type"`
+	StatusCode  int          `json:"status_code,omitempty"`
+	FileSize    int64        `json:"file_size,omitempty"`
+	ContentType string       `json:"content_type,omitempty"`
+	IsInternal  bool         `json:"is_internal"`
+}
+
 // Image represents an <img> element
 type Image struct {
 	Src         string `json:"src"`
@@ -105,6 +124,8 @@ type PageData struct {
 	RedirectChain         []RedirectHop     `json:"redirect_chain,omitempty"`
 	Links                 []Link            `json:"links"`
 	Images                []Image           `json:"images"`
+	Resources             []Resource        `json:"resources,omitempty"`
+	FontFaceNoDisplay     int               `json:"font_face_no_display,omitempty"`
 	SchemaJSONRaw         []string          `json:"schema_json_raw"`
 	OGTags                map[string]string `json:"og_tags"`
 	TwitterTags           map[string]string `json:"twitter_tags"`
@@ -207,6 +228,7 @@ type CrawlConfig struct {
 	// "mobile"  = only surface mobile + diff issues.
 	Platform              Platform
 	ValidateExternalLinks bool
+	DiscoverResources     bool
 	// OnProgress is called after each page is successfully crawled.
 	// crawled = total pages done so far; currentURL = the URL just processed.
 	// Safe to leave nil.

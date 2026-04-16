@@ -162,5 +162,9 @@ done:
 		ValidateExternalLinks(ctx, pages, c.config.UserAgent)
 	}
 
+	if c.config.DiscoverResources {
+		ValidateResources(ctx, pages, c.config.UserAgent)
+	}
+
 	return audit, nil
 }

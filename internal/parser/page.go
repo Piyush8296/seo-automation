@@ -43,6 +43,10 @@ func ExtractPage(body []byte, pageURL string, headers map[string]string) (*model
 	// Images
 	page.Images = extractImages(doc, pageURL)
 
+	// Sub-resources (CSS, JS, fonts)
+	page.Resources = ExtractResources(doc, pageURL)
+	page.FontFaceNoDisplay = CountFontFaceNoDisplay(doc)
+
 	// Body text + word count
 	page.BodyText, page.WordCount = extractBodyText(doc)
 

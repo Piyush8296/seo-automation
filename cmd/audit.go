@@ -28,6 +28,7 @@ var (
 	flagExitCode    bool
 	flagPlatform         string
 	flagValidateExtLinks bool
+	flagDiscoverResources bool
 )
 
 var auditCmd = &cobra.Command{
@@ -53,6 +54,7 @@ func init() {
 	auditCmd.Flags().BoolVar(&flagExitCode, "exit-code", false, "Exit 1 if any errors found")
 	auditCmd.Flags().StringVar(&flagPlatform, "platform", "", "Focus platform: desktop, mobile, or all (default: show both, bifurcated)")
 	auditCmd.Flags().BoolVar(&flagValidateExtLinks, "validate-external-links", false, "Validate external links via HEAD requests (slow, disabled by default)")
+	auditCmd.Flags().BoolVar(&flagDiscoverResources, "discover-resources", false, "Discover CSS/JS/font sub-resources and HEAD-validate them (slow, disabled by default)")
 	_ = auditCmd.MarkFlagRequired("url")
 }
 
@@ -82,6 +84,7 @@ func runAudit(cmd *cobra.Command, args []string) error {
 		MobileUA:      "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
 		Platform:              platform,
 		ValidateExternalLinks: flagValidateExtLinks,
+		DiscoverResources:     flagDiscoverResources,
 	}
 
 	platformLabel := "desktop + mobile (bifurcated)"
@@ -106,6 +109,9 @@ func runAudit(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stderr, " concurrency=%d platform=%s\n", flagConcurrency, platformLabel)
 	if flagValidateExtLinks {
 		fmt.Fprintf(os.Stderr, "  external link validation: enabled\n")
+	}
+	if flagDiscoverResources {
+		fmt.Fprintf(os.Stderr, "  sub-resource discovery: enabled\n")
 	}
 
 	c := crawler.NewCrawler(config)
