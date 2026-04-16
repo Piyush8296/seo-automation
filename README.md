@@ -1,115 +1,160 @@
 # SEO Audit
 
-Production-grade technical SEO crawler with 175+ checks modelled after Screaming Frog and SEMrush Site Audit. Run it locally, in GitHub Actions, or as a Claude agent.
+Production-grade technical SEO crawler with 175+ checks modelled after Screaming Frog and SEMrush Site Audit. Includes a React dashboard for starting audits, tracking progress in real-time, and viewing results.
 
 ---
 
 ## Quick start
 
+**Prerequisites:** Go 1.22+, Node.js 18+
+
 ```bash
-# Build
+# Install frontend dependencies
+make setup
+
+# Build everything and start the server
+make run
+```
+
+Open **http://localhost:8080** in your browser.
+
+---
+
+## Running the project
+
+### Option 1: Make (recommended)
+
+| Command | Description |
+|---|---|
+| `make setup` | Install frontend npm dependencies |
+| `make run` | Build Go + React, start the server on `:8080` |
+| `make dev` | Start Go server + Vite dev server (hot reload) |
+| `make docker` | Build and run with Docker Compose |
+| `make clean` | Remove build artifacts |
+
+### Option 2: Manual
+
+```bash
+# Build the Go binary
 go build -o seo-audit .
 
-# Audit a site
+# Build the React frontend
+cd ui && npm install && npm run build && cd ..
+
+# Start the server (API + UI on one port)
+./seo-audit serve --port 8080 --ui-dir ui/dist
+```
+
+### Option 3: Docker
+
+```bash
+docker compose up --build
+# → http://localhost:8080
+```
+
+No Go or Node.js needed — everything builds inside Docker.
+
+### Development mode
+
+Run the Go backend and Vite dev server separately for hot reload:
+
+```bash
+# Terminal 1: Go backend
+go build -o seo-audit . && ./seo-audit serve --port 8080
+
+# Terminal 2: Vite dev server (proxies /api → :8080)
+cd ui && npm run dev
+# → http://localhost:5173
+```
+
+Or just run `make dev` to start both.
+
+---
+
+## Web UI
+
+The dashboard at **http://localhost:8080** lets you:
+
+- **Start audits** — enter a URL with config options (depth, concurrency, timeout, platform)
+- **Track progress** — real-time updates via SSE with live page count and current URL
+- **View results** — health scores with A–F grades (Overall, Desktop, Mobile), error/warning/notice counts
+- **Browse reports** — embedded interactive HTML reports with download and fullscreen
+- **Compare audits** — diff two runs to track improvements or regressions
+- **Manage history** — re-run, delete, or compare past audits
+
+---
+
+## CLI
+
+### Audit a site
+
+```bash
 ./seo-audit audit --url https://www.cars24.com
 ```
 
 Reports are written to `./reports/` — open `report.html` in a browser for the full interactive dashboard.
-
----
-
-## Modes
-
-### 1. Local CLI
-
-```bash
-./seo-audit audit --url <URL> [flags]
-```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--url` | *(required)* | Site to crawl |
 | `--max-depth` | `-1` (unlimited) | How many link hops from the start URL |
 | `--max-pages` | `0` (unlimited) | Stop after N pages crawled |
-| `--concurrency` | `5` | Parallel crawl workers (raise for speed, lower for polite crawling) |
+| `--concurrency` | `5` | Parallel crawl workers |
 | `--timeout` | `30s` | Per-request timeout — e.g. `15s`, `1m` |
 | `--format` | `json,html,markdown` | Comma-separated output formats |
 | `--output-dir` | `./reports` | Where to write report files |
-| `--sitemap` | *(auto-detected)* | Override sitemap URL if auto-detection fails |
-| `--platform` | *(not set)* | `desktop`, `mobile`, or omit for bifurcated report showing both |
-| `--no-mobile-check` | `false` | Skip the mobile vs desktop comparison (same as `--platform desktop`) |
-| `--exit-code` | `false` | Exit 1 if any errors are found (useful in CI) |
+| `--sitemap` | *(auto-detected)* | Override sitemap URL |
+| `--platform` | *(not set)* | `desktop`, `mobile`, or omit for both |
+| `--no-mobile-check` | `false` | Skip mobile vs desktop comparison |
+| `--exit-code` | `false` | Exit 1 if any errors are found (CI) |
 
 **Examples:**
 
 ```bash
-# Quick shallow audit — top 3 levels, max 100 pages
+# Quick shallow audit
 ./seo-audit audit --url https://example.com --max-depth 3 --max-pages 100
 
-# Deep full-site crawl with higher concurrency
-./seo-audit audit --url https://example.com --max-depth -1 --max-pages 0 --concurrency 10
+# Deep full-site crawl
+./seo-audit audit --url https://example.com --concurrency 10
 
-# Default: bifurcated report with desktop + mobile scores side by side
-./seo-audit audit --url https://example.com
-
-# Desktop only (skips mobile fetch — faster)
+# Desktop only (faster)
 ./seo-audit audit --url https://example.com --platform desktop
 
-# Mobile focus — shows mobile-specific and M↔D diff issues only
-./seo-audit audit --url https://example.com --platform mobile
-
-# JSON only, custom timeout
-./seo-audit audit --url https://example.com --format json --timeout 15s
-
-# Fail the process if any errors exist (for CI gates)
+# Fail in CI if errors exist
 ./seo-audit audit --url https://example.com --exit-code
 ```
 
----
+### HTTP server
 
-### 2. Compare two audits (`diff`)
+```bash
+./seo-audit serve [flags]
+```
 
-Track regressions and improvements between runs:
+| Flag | Default | Description |
+|---|---|---|
+| `--port` | `8080` | HTTP server port |
+| `--reports-dir` | `~/.seo-reports` | Root directory for audit reports |
+| `--ui-dir` | *(empty)* | Path to built frontend assets (e.g. `ui/dist`) |
+
+### Compare two audits (`diff`)
 
 ```bash
 ./seo-audit diff reports/before.json reports/after.json
 ```
 
-Shows:
-- **New issues** — problems introduced since the last run
-- **Resolved issues** — problems that were fixed
-- **Persisting issues** — still present in both reports
+Shows new issues, resolved issues, and persisting issues between runs.
 
-**Tip:** Rename the report before re-running so you can compare:
-```bash
-cp reports/report.json reports/before.json
-./seo-audit audit --url https://example.com
-./seo-audit diff reports/before.json reports/report.json
-```
-
----
-
-### 3. CI threshold gate (`check-exit`)
-
-Use after an audit to fail a build if too many issues exist:
+### CI threshold gate (`check-exit`)
 
 ```bash
 ./seo-audit check-exit --report reports/report.json --max-errors 0 --max-warnings 50
 ```
 
-| Flag | Default | Description |
-|---|---|---|
-| `--report` | *(required)* | Path to `report.json` |
-| `--max-errors` | `0` | Exit 1 if errors exceed this count |
-| `--max-warnings` | `50` | Exit 1 if warnings exceed this count |
-
 ---
 
-### 4. GitHub Actions
+## GitHub Actions
 
-The workflow runs automatically every day at 02:00 UTC, and can also be triggered manually via **Actions → SEO Audit → Run workflow**.
-
-**Manual dispatch parameters:**
+The workflow runs daily at 02:00 UTC and can be triggered manually via **Actions → SEO Audit → Run workflow**.
 
 | Parameter | Default | Description |
 |---|---|---|
@@ -117,48 +162,49 @@ The workflow runs automatically every day at 02:00 UTC, and can also be triggere
 | `max_depth` | `3` | Max crawl depth |
 | `max_pages` | `500` | Max pages to crawl |
 | `concurrency` | `5` | Parallel workers |
-| `mobile_check` | `true` | Enable mobile vs desktop comparison |
-| `fail_on_errors` | `false` | Fail the workflow if SEO errors are found |
+| `mobile_check` | `true` | Enable mobile comparison |
+| `fail_on_errors` | `false` | Fail workflow on SEO errors |
 
-Reports are uploaded as a workflow artifact (`seo-reports-<run_number>`) and retained for 10 days.
-
-To change the schedule, edit the cron expression in `.github/workflows/seo-audit.yml`:
-```yaml
-schedule:
-  - cron: '0 2 * * *'   # Daily at 02:00 UTC
-```
+Reports are uploaded as workflow artifacts and retained for 10 days.
 
 ---
 
-### 5. Claude Agent
+## Claude Agent
 
-The `seo-audit` agent is defined in `.claude/agents/seo-audit.md`. Claude will automatically delegate to it when you ask about SEO auditing.
-
-**How to invoke:**
-
-Just ask Claude naturally — no special syntax needed:
+Ask Claude naturally — no special syntax needed:
 
 ```
 run seo audit on https://www.cars24.com
-audit https://example.com for seo
-check seo issues on https://example.com
-technical seo audit https://example.com
-```
-
-**Passing parameters to the agent:**
-
-```
 audit https://example.com with max-depth 5 and max-pages 500
-audit https://example.com, skip mobile check, concurrency 10
-deep crawl https://example.com — unlimited depth, no page limit
-quick audit https://example.com — depth 2, max 50 pages, json only
 ```
 
-The agent understands natural language parameters and maps them to the correct CLI flags. It then:
-1. Builds the binary if needed
-2. Runs the crawl
-3. Reads the JSON output
-4. Returns a prioritized expert report with actionable fix recommendations
+The agent builds the binary, runs the crawl, and returns a prioritized report with fix recommendations.
+
+---
+
+## Project structure
+
+```
+seo-automation/
+├── cmd/                    # CLI commands (audit, serve, diff, check-exit)
+├── internal/
+│   ├── server/             # HTTP API, SSE, audit lifecycle, storage
+│   ├── crawler/            # BFS crawl engine, workers, robots.txt
+│   ├── parser/             # HTML extraction (meta, links, schema, headers)
+│   ├── checks/             # 175+ SEO checks across 22 categories
+│   ├── models/             # Data structures
+│   └── report/             # HTML, JSON, Markdown report generation
+├── ui/                     # React frontend (Vite + Tailwind)
+│   ├── src/
+│   │   ├── pages/          # Home, AuditDetail
+│   │   ├── components/     # AuditForm, CrawlProgress, ScoreCard, etc.
+│   │   ├── hooks/          # useSSE (Server-Sent Events)
+│   │   └── lib/            # API client, utilities
+│   └── ...
+├── Makefile                # Build & run commands
+├── Dockerfile              # Multi-stage build (Node + Go → scratch)
+└── docker-compose.yml      # Single-service deployment
+```
 
 ---
 
@@ -174,30 +220,30 @@ The agent understands natural language parameters and maps them to the correct C
 
 ## Checks (175+ across 22 categories)
 
-| Category | Checks | What's covered |
+| Category | # | What's covered |
 |---|---|---|
 | Crawlability | 15 | 4xx/5xx, redirect chains, noindex conflicts, robots.txt blocks, orphan pages |
 | HTTPS & Security | 10 | Mixed content, HSTS, CSP, X-Frame-Options, Referrer-Policy |
-| Performance | 12 | Response time, HTML size, compression, cache headers, render-blocking resources |
+| Performance | 12 | Response time, HTML size, compression, cache headers, render-blocking |
 | Internal Linking | 10 | Broken links, redirect targets, nofollow, empty anchors, orphan pages |
-| Titles | 5 | Missing, too short (<10 chars), too long (>60 chars), duplicates |
-| Meta Descriptions | 5 | Missing, too short (<50 chars), too long (>160 chars), duplicates |
+| Titles | 5 | Missing, too short/long, duplicates |
+| Meta Descriptions | 5 | Missing, too short/long, duplicates |
 | Content | 6 | Thin content, lorem ipsum, title = H1, near-duplicate pages |
 | Headings | 8 | H1 missing/multiple/empty, hierarchy skipped, duplicates |
 | Canonical | 5 | Missing, non-absolute, insecure, points elsewhere, og:url conflict |
 | Images | 7 | Alt missing/empty, filename as alt, dimensions missing, srcset missing |
-| Structured Data | 10 | Invalid JSON-LD, missing required fields (Article, Product, Breadcrumb, FAQ) |
+| Structured Data | 10 | Invalid JSON-LD, missing required fields |
 | Social / OG | 8 | og:title/description/image/url missing, Twitter card missing |
 | URL Structure | 8 | Too long, underscores, uppercase, session params, double slashes |
 | Mobile | 4 | Viewport missing/invalid, font size, user-scalable=no |
-| Mobile vs Desktop | 10 | Title/meta/H1/canonical/schema mismatch between mobile and desktop responses |
-| International | 7 | Non-absolute hreflang, invalid BCP47 lang codes, missing x-default, no self-ref |
-| Sitemap | 8 | Missing sitemap, 4xx/redirected/noindex URLs in sitemap, coverage <80% |
-| Pagination | 6 | Self-canonical on paginated pages, thin paginated content, noindex |
-| AMP | 3 | AMP missing canonical, canonical points to AMP, regular page missing amphtml |
-| Crawl Budget | 6 | Tracking params, faceted nav, internal search pages indexed, sitemap+noindex conflict |
-| Core Web Vitals | 7 | LCP image not preloaded, CLS from fonts/images, FID from blocking scripts |
-| E-E-A-T | 8 | Author info missing, article dates missing, thin About/Contact/Privacy pages |
+| Mobile vs Desktop | 10 | Title/meta/H1/canonical/schema mismatch |
+| International | 7 | Non-absolute hreflang, invalid BCP47, missing x-default |
+| Sitemap | 8 | Missing sitemap, 4xx/redirected/noindex URLs, coverage <80% |
+| Pagination | 6 | Self-canonical on paginated pages, thin content, noindex |
+| AMP | 3 | Missing canonical, canonical points to AMP |
+| Crawl Budget | 6 | Tracking params, faceted nav, internal search indexed |
+| Core Web Vitals | 7 | LCP image not preloaded, CLS from fonts/images, FID blocking scripts |
+| E-E-A-T | 8 | Author info missing, article dates missing, thin About/Contact/Privacy |
 
 ---
 
@@ -220,4 +266,5 @@ score = 100 − ((errors × 10 + warnings × 3 + notices × 1) × 100 / totalChe
 ## Requirements
 
 - Go 1.22+
+- Node.js 18+ (for frontend build)
 - Internet access from the machine running the audit

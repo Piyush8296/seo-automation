@@ -18,6 +18,7 @@ import (
 var (
 	flagServerPort    int
 	flagServerBaseDir string
+	flagUIDir         string
 )
 
 var serverCmd = &cobra.Command{
@@ -44,10 +45,11 @@ Endpoints:
 func init() {
 	serverCmd.Flags().IntVar(&flagServerPort, "port", 8080, "HTTP server port")
 	serverCmd.Flags().StringVar(&flagServerBaseDir, "reports-dir", "", "Root directory for audit reports (default: ~/.seo-reports)")
+	serverCmd.Flags().StringVar(&flagUIDir, "ui-dir", "", "Path to built frontend assets (e.g. ui/dist)")
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
-	srv, err := server.New(flagServerBaseDir)
+	srv, err := server.New(flagServerBaseDir, flagUIDir)
 	if err != nil {
 		return fmt.Errorf("initialise server: %w", err)
 	}

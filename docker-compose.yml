@@ -1,45 +1,17 @@
 version: "3.9"
 
-# ─── Shared environment anchors ──────────────────────────────────────────────
-x-api-env: &api-env
-  PORT: "8080"
-  REPORTS_DIR: /data/reports
-
 services:
-
-  # ── Go API server ────────────────────────────────────────────────────────
-  api:
+  seo-audit:
     build:
       context: .
       dockerfile: Dockerfile
-    image: seo-audit-api:local
+    image: seo-audit:local
     restart: unless-stopped
-    environment:
-      <<: *api-env
-    command: ["--port", "8080", "--reports-dir", "/data/reports"]
+    command: ["--port", "8080", "--reports-dir", "/data/reports", "--ui-dir", "/ui/dist"]
     ports:
-      - "${API_PORT:-8080}:8080"
+      - "${PORT:-8080}:8080"
     volumes:
       - reports:/data/reports
-    # Note: FROM scratch has no shell/utilities so in-container healthchecks are not
-    # possible. The ui service uses service_started below; add a sidecar or reverse
-    # proxy if you need liveness probes in production.
-
-  # ── React UI (production build served by nginx) ──────────────────────────
-  ui:
-    build:
-      context: ../seo-ui
-      dockerfile: Dockerfile
-      args:
-        # Empty = nginx proxies /api → api:8080 internally
-        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-}"
-    image: seo-audit-ui:local
-    restart: unless-stopped
-    ports:
-      - "${UI_PORT:-3000}:80"
-    depends_on:
-      api:
-        condition: service_started
 
 volumes:
   reports:
