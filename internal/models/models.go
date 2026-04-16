@@ -46,15 +46,27 @@ type SiteCheck interface {
 	Run(pages []*PageData) []CheckResult
 }
 
+// LinkPosition classifies where on a page a link appears.
+type LinkPosition string
+
+const (
+	PositionHeader  LinkPosition = "header"
+	PositionNav     LinkPosition = "nav"
+	PositionContent LinkPosition = "content"
+	PositionFooter  LinkPosition = "footer"
+	PositionSidebar LinkPosition = "sidebar"
+)
+
 // Link represents a hyperlink found on a page
 type Link struct {
-	URL        string `json:"url"`
-	Text       string `json:"text"`
-	Rel        string `json:"rel"`
-	IsInternal bool   `json:"is_internal"`
-	IsFollow   bool   `json:"is_follow"`
-	StatusCode int    `json:"status_code,omitempty"`
-	Timeout    bool   `json:"timeout,omitempty"`
+	URL        string       `json:"url"`
+	Text       string       `json:"text"`
+	Rel        string       `json:"rel"`
+	IsInternal bool         `json:"is_internal"`
+	IsFollow   bool         `json:"is_follow"`
+	Position   LinkPosition `json:"position,omitempty"`
+	StatusCode int          `json:"status_code,omitempty"`
+	Timeout    bool         `json:"timeout,omitempty"`
 }
 
 // ResourceType classifies a sub-resource discovered on a page.

@@ -26,6 +26,8 @@ func PageChecks() []models.PageCheck {
 		&externalBroken5xx{},
 		&externalTimeout{},
 		&externalRedirect{},
+		&footerHeavy{},
+		&noContentLinks{},
 	}
 }
 
@@ -34,6 +36,7 @@ func SiteChecks() []models.SiteCheck {
 	return []models.SiteCheck{
 		&orphanPage{},
 		&lowInlinks{},
+		&navOrphan{},
 	}
 }
 
@@ -306,6 +309,122 @@ func (c *externalRedirect) Run(p *models.PageData) []models.CheckResult {
 				Details:  link.URL,
 			})
 		}
+	}
+	return results
+}
+
+type footerHeavy struct{}
+
+func (c *footerHeavy) Run(p *models.PageData) []models.CheckResult {
+	total := 0
+	footer := 0
+	for _, l := range p.Links {
+		if !l.IsInternal {
+			continue
+		}
+		total++
+		if l.Position == models.PositionFooter {
+			footer++
+		}
+	}
+	if total < 10 {
+		return nil
+	}
+	pct := float64(footer) / float64(total)
+	if pct > 0.70 {
+		return []models.CheckResult{{
+			ID:       "links.footer_heavy",
+			Category: "Internal Linking",
+			Severity: models.SeverityWarning,
+			Message:  fmt.Sprintf("%.0f%% of internal links are in the footer (%d of %d)", pct*100, footer, total),
+			URL:      p.URL,
+		}}
+	}
+	return nil
+}
+
+type noContentLinks struct{}
+
+func (c *noContentLinks) Run(p *models.PageData) []models.CheckResult {
+	total := 0
+	content := 0
+	for _, l := range p.Links {
+		if !l.IsInternal {
+			continue
+		}
+		total++
+		if l.Position == models.PositionContent {
+			content++
+		}
+	}
+	if total < 5 {
+		return nil
+	}
+	if content == 0 {
+		return []models.CheckResult{{
+			ID:       "links.no_content_links",
+			Category: "Internal Linking",
+			Severity: models.SeverityWarning,
+			Message:  fmt.Sprintf("Page has no internal links in main content (%d links, all in nav/header/footer/sidebar)", total),
+			URL:      p.URL,
+		}}
+	}
+	return nil
+}
+
+type navOrphan struct{}
+
+func (c *navOrphan) Run(pages []*models.PageData) []models.CheckResult {
+	// Skip entirely if the site uses no nav-positioned links (no <nav>/role=navigation anywhere).
+	hasAnyNav := false
+	for _, p := range pages {
+		for _, l := range p.Links {
+			if l.IsInternal && l.Position == models.PositionNav {
+				hasAnyNav = true
+				break
+			}
+		}
+		if hasAnyNav {
+			break
+		}
+	}
+	if !hasAnyNav {
+		return nil
+	}
+
+	navInlinks := map[string]int{}
+	anyInlinks := map[string]int{}
+	for _, p := range pages {
+		for _, l := range p.Links {
+			if !l.IsInternal {
+				continue
+			}
+			anyInlinks[l.URL]++
+			if l.Position == models.PositionNav {
+				navInlinks[l.URL]++
+			}
+		}
+	}
+
+	var results []models.CheckResult
+	for _, p := range pages {
+		if p.Depth == 0 {
+			continue
+		}
+		total := anyInlinks[p.URL] + anyInlinks[p.FinalURL]
+		if total < 3 {
+			continue // too few inlinks to be meaningful; orphan/low_inlinks cover these
+		}
+		if navInlinks[p.URL]+navInlinks[p.FinalURL] > 0 {
+			continue
+		}
+		results = append(results, models.CheckResult{
+			ID:       "links.nav_orphan",
+			Category: "Internal Linking",
+			Severity: models.SeverityNotice,
+			Message:  fmt.Sprintf("Page has %d internal inlinks but none from site navigation", total),
+			URL:      p.URL,
+		})
 	}
 	return results
 }

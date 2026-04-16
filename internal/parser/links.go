@@ -80,9 +80,57 @@ func ExtractLinks(doc *goquery.Document, baseURL string) []models.Link {
 			Rel:        rel,
 			IsInternal: isInternal,
 			IsFollow:   isFollow,
+			Position:   classifyLinkPosition(s),
 		})
 	})
 	return links
+}
+
+// classifyLinkPosition walks the link's ancestors and returns the position of
+// the nearest semantic container (nav, header, footer, aside, main/article).
+// Defaults to content when no semantic ancestor is found.
+func classifyLinkPosition(s *goquery.Selection) models.LinkPosition {
+	pos := models.LinkPosition("")
+	s.Parents().EachWithBreak(func(_ int, p *goquery.Selection) bool {
+		tag := goquery.NodeName(p)
+		role := strings.ToLower(strings.TrimSpace(p.AttrOr("role", "")))
+		id := strings.ToLower(strings.TrimSpace(p.AttrOr("id", "")))
+		class := strings.ToLower(p.AttrOr("class", ""))
+
+		switch {
+		case tag == "nav" || role == "navigation":
+			pos = models.PositionNav
+		case tag == "footer" || role == "contentinfo" || idOrClassHas(id, class, "footer"):
+			pos = models.PositionFooter
+		case tag == "header" || role == "banner" || idOrClassHas(id, class, "header"):
+			pos = models.PositionHeader
+		case tag == "aside" || role == "complementary" || idOrClassHas(id, class, "sidebar"):
+			pos = models.PositionSidebar
+		case tag == "main" || tag == "article" || role == "main":
+			pos = models.PositionContent
+		default:
+			return true
+		}
+		return false
+	})
+	if pos == "" {
+		return models.PositionContent
+	}
+	return pos
+}
+
+// idOrClassHas reports whether the id equals name or any class token equals name
+// (exact token match to avoid false positives like "subheader" matching "header").
+func idOrClassHas(id, class, name string) bool {
+	if id == name {
+		return true
+	}
+	for _, c := range strings.Fields(class) {
+		if c == name {
+			return true
+		}
+	}
+	return false
 }
 
 // HasMixedContent returns true if an HTTPS page loads HTTP resources.
