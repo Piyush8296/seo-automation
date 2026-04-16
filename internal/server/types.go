@@ -20,7 +20,8 @@ type StartAuditRequest struct {
 	Concurrency int    `json:"concurrency"`
 	Timeout     string `json:"timeout"`
 	Platform    string `json:"platform"`
-	OutputDir   string `json:"output_dir"` // optional — overrides default storage dir
+	OutputDir             string `json:"output_dir"`              // optional — overrides default storage dir
+	ValidateExternalLinks bool   `json:"validate_external_links"` // opt-in external link validation
 }
 
 // AuditRecord is the persistent metadata for one audit run, stored as meta.json.

@@ -22,6 +22,10 @@ func PageChecks() []models.PageCheck {
 		&emptyAnchor{},
 		&genericAnchor{},
 		&tooManyOutlinks{},
+		&externalBroken4xx{},
+		&externalBroken5xx{},
+		&externalTimeout{},
+		&externalRedirect{},
 	}
 }
 
@@ -211,6 +215,95 @@ func (o *orphanPage) Run(pages []*models.PageData) []models.CheckResult {
 				Severity: models.SeverityWarning,
 				Message:  "Page has no internal inlinks (orphan)",
 				URL:      p.URL,
+			})
+		}
+	}
+	return results
+}
+
+// External link checks — only produce results when --validate-external-links is enabled
+// (i.e. when StatusCode > 0 or Timeout is set).
+
+type externalBroken4xx struct{}
+
+func (c *externalBroken4xx) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, link := range p.Links {
+		if link.IsInternal || (link.StatusCode == 0 && !link.Timeout) {
+			continue
+		}
+		if link.StatusCode >= 400 && link.StatusCode < 500 {
+			results = append(results, models.CheckResult{
+				ID:       "links.external.broken_4xx",
+				Category: "Internal Linking",
+				Severity: models.SeverityError,
+				Message:  fmt.Sprintf("External link returns %d", link.StatusCode),
+				URL:      p.URL,
+				Details:  link.URL,
+			})
+		}
+	}
+	return results
+}
+
+type externalBroken5xx struct{}
+
+func (c *externalBroken5xx) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, link := range p.Links {
+		if link.IsInternal || (link.StatusCode == 0 && !link.Timeout) {
+			continue
+		}
+		if link.StatusCode >= 500 {
+			results = append(results, models.CheckResult{
+				ID:       "links.external.broken_5xx",
+				Category: "Internal Linking",
+				Severity: models.SeverityError,
+				Message:  fmt.Sprintf("External link returns %d", link.StatusCode),
+				URL:      p.URL,
+				Details:  link.URL,
+			})
+		}
+	}
+	return results
+}
+
+type externalTimeout struct{}
+
+func (c *externalTimeout) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, link := range p.Links {
+		if link.IsInternal || !link.Timeout {
+			continue
+		}
+		results = append(results, models.CheckResult{
+			ID:       "links.external.timeout",
+			Category: "Internal Linking",
+			Severity: models.SeverityWarning,
+			Message:  "External link timed out",
+			URL:      p.URL,
+			Details:  link.URL,
+		})
+	}
+	return results
+}
+
+type externalRedirect struct{}
+
+func (c *externalRedirect) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, link := range p.Links {
+		if link.IsInternal || (link.StatusCode == 0 && !link.Timeout) {
+			continue
+		}
+		if link.StatusCode >= 300 && link.StatusCode < 400 {
+			results = append(results, models.CheckResult{
+				ID:       "links.external.redirect",
+				Category: "Internal Linking",
+				Severity: models.SeverityNotice,
+				Message:  fmt.Sprintf("External link redirects (%d)", link.StatusCode),
+				URL:      p.URL,
+				Details:  link.URL,
 			})
 		}
 	}

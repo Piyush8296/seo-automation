@@ -26,7 +26,8 @@ var (
 	flagFormats     string
 	flagOutputDir   string
 	flagExitCode    bool
-	flagPlatform    string
+	flagPlatform         string
+	flagValidateExtLinks bool
 )
 
 var auditCmd = &cobra.Command{
@@ -51,6 +52,7 @@ func init() {
 	auditCmd.Flags().StringVar(&flagOutputDir, "output-dir", "./reports", "Output directory for reports")
 	auditCmd.Flags().BoolVar(&flagExitCode, "exit-code", false, "Exit 1 if any errors found")
 	auditCmd.Flags().StringVar(&flagPlatform, "platform", "", "Focus platform: desktop, mobile, or all (default: show both, bifurcated)")
+	auditCmd.Flags().BoolVar(&flagValidateExtLinks, "validate-external-links", false, "Validate external links via HEAD requests (slow, disabled by default)")
 	_ = auditCmd.MarkFlagRequired("url")
 }
 
@@ -78,7 +80,8 @@ func runAudit(cmd *cobra.Command, args []string) error {
 		NoMobileCheck: noMobile,
 		UserAgent:     "SEOAuditBot/1.0 (+https://github.com/cars24/seo-automation)",
 		MobileUA:      "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-		Platform:      platform,
+		Platform:              platform,
+		ValidateExternalLinks: flagValidateExtLinks,
 	}
 
 	platformLabel := "desktop + mobile (bifurcated)"
@@ -101,6 +104,9 @@ func runAudit(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, " max-pages=unlimited")
 	}
 	fmt.Fprintf(os.Stderr, " concurrency=%d platform=%s\n", flagConcurrency, platformLabel)
+	if flagValidateExtLinks {
+		fmt.Fprintf(os.Stderr, "  external link validation: enabled\n")
+	}
 
 	c := crawler.NewCrawler(config)
 	audit, err := c.Crawl(context.Background())

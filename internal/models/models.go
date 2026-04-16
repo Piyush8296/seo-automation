@@ -54,6 +54,7 @@ type Link struct {
 	IsInternal bool   `json:"is_internal"`
 	IsFollow   bool   `json:"is_follow"`
 	StatusCode int    `json:"status_code,omitempty"`
+	Timeout    bool   `json:"timeout,omitempty"`
 }
 
 // Image represents an <img> element
@@ -204,7 +205,8 @@ type CrawlConfig struct {
 	// "" or "all" = run both and show bifurcated report (default).
 	// "desktop" = skip mobile fetch, only surface desktop issues.
 	// "mobile"  = only surface mobile + diff issues.
-	Platform Platform
+	Platform              Platform
+	ValidateExternalLinks bool
 	// OnProgress is called after each page is successfully crawled.
 	// crawled = total pages done so far; currentURL = the URL just processed.
 	// Safe to leave nil.
