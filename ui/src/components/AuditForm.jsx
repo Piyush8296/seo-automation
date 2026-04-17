@@ -9,8 +9,8 @@ const DEFAULTS = {
   timeout: '30s',
   platform: '',
   output_dir: '',
-  validate_external_links: false,
-  discover_resources: false,
+  validate_external_links: true,
+  discover_resources: true,
 }
 
 export default function AuditForm({ onSubmit, loading }) {
