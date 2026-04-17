@@ -150,10 +150,33 @@ func (c *bodyExactDuplicate) Run(pages []*models.PageData) []models.CheckResult 
 
 // Site-wide near-duplicate detection using SimHash fingerprinting.
 // SimHash produces a 64-bit fingerprint per document; documents with
-// a Hamming distance ≤ 3 are flagged as near-duplicates.
+// a Hamming distance ≤ SimHashMaxDistance are flagged as near-duplicates.
 type bodyNearDuplicate struct{}
 
-const simhashMaxDistance = 3
+// SimHashMaxDistance is the default Hamming-distance threshold for near-duplicate detection.
+// Value 3 out of 64 bits ≈ 95% similarity.
+const SimHashMaxDistance = 3
+
+// simhashMaxDistanceOverride, when > 0, replaces SimHashMaxDistance at runtime.
+// Set via SetSimHashMaxDistanceOverride (wired up from the CLI --simhash-distance flag).
+var simhashMaxDistanceOverride int
+
+// SetSimHashMaxDistanceOverride sets the runtime override for the near-duplicate
+// Hamming-distance threshold. Pass d <= 0 to clear the override and restore the default.
+func SetSimHashMaxDistanceOverride(d int) {
+	if d <= 0 {
+		simhashMaxDistanceOverride = 0
+		return
+	}
+	simhashMaxDistanceOverride = d
+}
+
+func effectiveSimHashDistance() int {
+	if simhashMaxDistanceOverride > 0 {
+		return simhashMaxDistanceOverride
+	}
+	return SimHashMaxDistance
+}
 
 func (c *bodyNearDuplicate) Run(pages []*models.PageData) []models.CheckResult {
 	type candidate struct {
@@ -183,11 +206,12 @@ func (c *bodyNearDuplicate) Run(pages []*models.PageData) []models.CheckResult {
 	}
 
 	reported := make(map[string]bool)
+	maxDist := effectiveSimHashDistance()
 	var results []models.CheckResult
 	for i := 0; i < len(candidates); i++ {
 		for j := i + 1; j < len(candidates); j++ {
 			dist := hammingDistance(candidates[i].fingerprint, candidates[j].fingerprint)
-			if dist <= simhashMaxDistance {
+			if dist <= maxDist {
 				sim := float64(64-dist) / 64.0 * 100
 				if !reported[candidates[i].url] {
 					results = append(results, models.CheckResult{

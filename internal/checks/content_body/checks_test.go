@@ -105,8 +105,8 @@ func TestSimhash_SimilarTexts(t *testing.T) {
 	fp1 := simhash(base)
 	fp2 := simhash(similar)
 	dist := hammingDistance(fp1, fp2)
-	if dist > simhashMaxDistance {
-		t.Errorf("similar texts should have hamming distance <= %d, got %d", simhashMaxDistance, dist)
+	if dist > SimHashMaxDistance {
+		t.Errorf("similar texts should have hamming distance <= %d, got %d", SimHashMaxDistance, dist)
 	}
 }
 
@@ -117,8 +117,8 @@ func TestSimhash_DifferentTexts(t *testing.T) {
 	fp1 := simhash(text1)
 	fp2 := simhash(text2)
 	dist := hammingDistance(fp1, fp2)
-	if dist <= simhashMaxDistance {
-		t.Errorf("very different texts should have hamming distance > %d, got %d", simhashMaxDistance, dist)
+	if dist <= SimHashMaxDistance {
+		t.Errorf("very different texts should have hamming distance > %d, got %d", SimHashMaxDistance, dist)
 	}
 }
 
