@@ -32,10 +32,13 @@ func scoreFromStats(s models.AuditStats, pageCount int) float64 {
 	if pageCount <= 0 {
 		return 100
 	}
-	weighted := float64(s.Errors*3+s.Warnings) + float64(s.Notices)*0.3
-	perPage := weighted / float64(pageCount)
-	score := 100 - 20*math.Log10(1+perPage)
-	return math.Round(math.Max(0, math.Min(100, score))*10) / 10
+	// TODO: Check
+	// weighted := float64(s.Errors*3+s.Warnings) + float64(s.Notices)*0.3
+	// perPage := weighted / float64(pageCount)
+	// score := 100 - 20*math.Log10(1+perPage)
+	// return math.Round(math.Max(0, math.Min(100, score))*10) / 10
+	penalty := float64(s.Errors*10+s.Warnings*3+s.Notices*1) * 10.0 / float64(s.TotalChecksRun)
+	return math.Round(math.Max(0, math.Min(100, 100-penalty))*10) / 10
 }
 
 // ComputeHealthScore calculates the overall, desktop, and mobile health scores.
