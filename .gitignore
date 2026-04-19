@@ -12,5 +12,8 @@ reports/
 .DS_Store
 __pycache__/
 
+# Claude Code (local agent state, worktrees, launch config)
+.claude/
+
 # Internal planning docs (local-only)
 FEATURE_ROADMAP.md
