@@ -62,8 +62,8 @@ export default function AuditForm({ onSubmit, loading }) {
   return (
     <form onSubmit={handleSubmit} className="card p-6 flex flex-col gap-5">
       <div>
-        <h2 className="text-lg font-bold text-gray-100 mb-1">New Audit</h2>
-        <p className="text-sm text-gray-500">Enter a URL to start a full technical SEO crawl</p>
+        <h2 className="font-display text-lg font-bold text-on-surface mb-1">New Audit</h2>
+        <p className="text-sm text-on-surface-variant">Enter a URL to start a full technical SEO crawl</p>
       </div>
 
       {/* URL */}
@@ -84,7 +84,7 @@ export default function AuditForm({ onSubmit, loading }) {
       <button
         type="button"
         onClick={() => setAdvanced((v) => !v)}
-        className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 transition-colors w-fit"
+        className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface transition-colors w-fit"
       >
         {advanced ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         Advanced configuration
@@ -92,7 +92,6 @@ export default function AuditForm({ onSubmit, loading }) {
 
       {advanced && (
         <div className="grid grid-cols-2 gap-4 pt-1">
-          {/* Max Depth */}
           <div>
             <label className="label">Max depth</label>
             <select
@@ -109,7 +108,6 @@ export default function AuditForm({ onSubmit, loading }) {
             </select>
           </div>
 
-          {/* Max Pages */}
           <div>
             <label className="label">Max pages</label>
             <select
@@ -126,7 +124,6 @@ export default function AuditForm({ onSubmit, loading }) {
             </select>
           </div>
 
-          {/* Concurrency */}
           <div>
             <label className="label">Concurrency — {form.concurrency} workers</label>
             <input
@@ -134,16 +131,16 @@ export default function AuditForm({ onSubmit, loading }) {
               min={1} max={20} step={1}
               value={form.concurrency}
               onChange={(e) => set('concurrency', e.target.value)}
-              className="w-full accent-emerald-500 mt-1"
+              className="w-full mt-1"
+              style={{ accentColor: '#3fe56c' }}
               disabled={loading}
             />
-            <div className="flex justify-between text-xs text-gray-600 mt-1">
+            <div className="flex justify-between text-xs text-on-surface-variant/60 mt-1">
               <span>1 (gentle)</span>
               <span>20 (fast)</span>
             </div>
           </div>
 
-          {/* Timeout */}
           <div>
             <label className="label">Request timeout</label>
             <select
@@ -159,7 +156,6 @@ export default function AuditForm({ onSubmit, loading }) {
             </select>
           </div>
 
-          {/* Platform */}
           <div>
             <label className="label">Platform</label>
             <select
@@ -213,7 +209,6 @@ export default function AuditForm({ onSubmit, loading }) {
             </select>
           </div>
 
-          {/* Output dir */}
           <div>
             <label className="label">Custom output dir</label>
             <input
@@ -322,8 +317,10 @@ export default function AuditForm({ onSubmit, loading }) {
             />
           </div>
 
-          {/* Opt-in slow checks */}
-          <div className="col-span-2 border-t border-gray-800 pt-4 mt-1 flex flex-col gap-3">
+          <div
+            className="col-span-2 pt-4 mt-1 flex flex-col gap-3"
+            style={{ borderTop: '1px solid rgba(60,74,60,0.35)' }}
+          >
             <label className="flex items-start gap-3 cursor-pointer group">
               <input
                 type="checkbox"
@@ -401,14 +398,13 @@ export default function AuditForm({ onSubmit, loading }) {
                 type="checkbox"
                 checked={form.validate_external_links}
                 onChange={(e) => set('validate_external_links', e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-gray-800 accent-emerald-500"
+                className="mt-0.5 h-4 w-4 rounded"
+                style={{ accentColor: '#3fe56c' }}
                 disabled={loading}
               />
               <div>
-                <div className="text-sm text-gray-200 group-hover:text-white">
-                  Validate external links
-                </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-sm text-on-surface">Validate external links</div>
+                <div className="text-xs text-on-surface-variant">
                   HEAD-check every outbound link for 4xx/5xx/timeouts. Adds significant crawl time.
                 </div>
               </div>
@@ -419,15 +415,14 @@ export default function AuditForm({ onSubmit, loading }) {
                 type="checkbox"
                 checked={form.discover_resources}
                 onChange={(e) => set('discover_resources', e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-gray-800 accent-emerald-500"
+                className="mt-0.5 h-4 w-4 rounded"
+                style={{ accentColor: '#3fe56c' }}
                 disabled={loading}
               />
               <div>
-                <div className="text-sm text-gray-200 group-hover:text-white">
-                  Discover sub-resources (CSS, JS, fonts)
-                </div>
-                <div className="text-xs text-gray-500">
-                  Fetch and validate every stylesheet, script and font. Detects broken assets and `font-display` issues. Slow.
+                <div className="text-sm text-on-surface">Discover sub-resources (CSS, JS, fonts)</div>
+                <div className="text-xs text-on-surface-variant">
+                  Fetch and validate every stylesheet, script and font. Detects broken assets. Slow.
                 </div>
               </div>
             </label>
@@ -436,7 +431,10 @@ export default function AuditForm({ onSubmit, loading }) {
       )}
 
       {error && (
-        <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5">
+        <div
+          className="text-sm rounded-xl px-4 py-2.5"
+          style={{ color: '#ffb4ab', background: 'rgba(147,0,10,0.2)' }}
+        >
           {error}
         </div>
       )}
@@ -444,13 +442,16 @@ export default function AuditForm({ onSubmit, loading }) {
       <button type="submit" className="btn-primary justify-center py-3" disabled={loading}>
         {loading ? (
           <>
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <span
+              className="w-4 h-4 rounded-full animate-spin"
+              style={{ border: '2px solid rgba(0,57,18,0.4)', borderTopColor: '#003912' }}
+            />
             Starting…
           </>
         ) : (
           <>
             <Play size={16} />
-            Start Crawl
+            Launch Crawl
           </>
         )}
       </button>
