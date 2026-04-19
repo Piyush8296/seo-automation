@@ -157,5 +157,14 @@ done:
 	audit.Pages = pages
 	audit.PagesCrawled = len(pages)
 	audit.PagesTotal = len(pages)
+
+	if c.config.ValidateExternalLinks {
+		ValidateExternalLinks(ctx, pages, c.config.UserAgent)
+	}
+
+	if c.config.DiscoverResources {
+		ValidateResources(ctx, pages, c.config.UserAgent)
+	}
+
 	return audit, nil
 }

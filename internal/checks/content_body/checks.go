@@ -1,7 +1,11 @@
 package content_body
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"hash/fnv"
+	"math/bits"
 	"strings"
 
 	"github.com/cars24/seo-automation/internal/models"
@@ -21,6 +25,7 @@ func PageChecks() []models.PageCheck {
 // SiteChecks returns site-wide content body checks.
 func SiteChecks() []models.SiteCheck {
 	return []models.SiteCheck{
+		&bodyExactDuplicate{},
 		&bodyNearDuplicate{},
 	}
 }
@@ -105,42 +110,115 @@ func (c *bodyNoindexMeta) Run(p *models.PageData) []models.CheckResult {
 	return nil
 }
 
-// Site-wide near-duplicate detection using Jaccard similarity on word sets.
-type bodyNearDuplicate struct{}
+// Site-wide exact duplicate detection using SHA-256 content hash.
+type bodyExactDuplicate struct{}
 
-func (c *bodyNearDuplicate) Run(pages []*models.PageData) []models.CheckResult {
-	type pageWords struct {
-		url   string
-		words map[string]bool
-	}
-	var candidates []pageWords
+func (c *bodyExactDuplicate) Run(pages []*models.PageData) []models.CheckResult {
+	hashToURLs := make(map[string][]string)
 	for _, p := range pages {
 		if p.WordCount < 100 || p.BodyText == "" {
 			continue
 		}
-		words := make(map[string]bool)
-		for _, w := range strings.Fields(strings.ToLower(p.BodyText)) {
-			if len(w) > 3 {
-				words[w] = true
-			}
-		}
-		if len(words) > 0 {
-			candidates = append(candidates, pageWords{url: p.URL, words: words})
-		}
+		h := sha256.Sum256([]byte(p.BodyText))
+		key := hex.EncodeToString(h[:])
+		hashToURLs[key] = append(hashToURLs[key], p.URL)
 	}
 
-	reported := map[string]bool{}
+	var results []models.CheckResult
+	for _, urls := range hashToURLs {
+		if len(urls) < 2 {
+			continue
+		}
+		for i, u := range urls {
+			// Pick another URL from the group as the "details" reference.
+			other := urls[0]
+			if i == 0 {
+				other = urls[1]
+			}
+			results = append(results, models.CheckResult{
+				ID:       "body.exact_duplicate",
+				Category: "Content",
+				Severity: models.SeverityError,
+				Message:  fmt.Sprintf("Exact duplicate content (%d pages share identical body)", len(urls)),
+				URL:      u,
+				Details:  other,
+			})
+		}
+	}
+	return results
+}
+
+// Site-wide near-duplicate detection using SimHash fingerprinting.
+// SimHash produces a 64-bit fingerprint per document; documents with
+// a Hamming distance ≤ SimHashMaxDistance are flagged as near-duplicates.
+type bodyNearDuplicate struct{}
+
+// SimHashMaxDistance is the default Hamming-distance threshold for near-duplicate detection.
+// Value 3 out of 64 bits ≈ 95% similarity.
+const SimHashMaxDistance = 3
+
+// simhashMaxDistanceOverride, when > 0, replaces SimHashMaxDistance at runtime.
+// Set via SetSimHashMaxDistanceOverride (wired up from the CLI --simhash-distance flag).
+var simhashMaxDistanceOverride int
+
+// SetSimHashMaxDistanceOverride sets the runtime override for the near-duplicate
+// Hamming-distance threshold. Pass d <= 0 to clear the override and restore the default.
+func SetSimHashMaxDistanceOverride(d int) {
+	if d <= 0 {
+		simhashMaxDistanceOverride = 0
+		return
+	}
+	simhashMaxDistanceOverride = d
+}
+
+func effectiveSimHashDistance() int {
+	if simhashMaxDistanceOverride > 0 {
+		return simhashMaxDistanceOverride
+	}
+	return SimHashMaxDistance
+}
+
+func (c *bodyNearDuplicate) Run(pages []*models.PageData) []models.CheckResult {
+	type candidate struct {
+		url       string
+		hash      string // exact content hash to skip exact duplicates
+		fingerprint uint64
+	}
+
+	// Build fingerprints.
+	hashToURL := make(map[string]string) // track exact hashes to skip them
+	var candidates []candidate
+	for _, p := range pages {
+		if p.WordCount < 100 || p.BodyText == "" {
+			continue
+		}
+		h := sha256.Sum256([]byte(p.BodyText))
+		key := hex.EncodeToString(h[:])
+
+		// Skip if we already have an exact duplicate — those are handled by bodyExactDuplicate.
+		if _, seen := hashToURL[key]; seen {
+			continue
+		}
+		hashToURL[key] = p.URL
+
+		fp := simhash(p.BodyText)
+		candidates = append(candidates, candidate{url: p.URL, hash: key, fingerprint: fp})
+	}
+
+	reported := make(map[string]bool)
+	maxDist := effectiveSimHashDistance()
 	var results []models.CheckResult
 	for i := 0; i < len(candidates); i++ {
 		for j := i + 1; j < len(candidates); j++ {
-			sim := jaccardSimilarity(candidates[i].words, candidates[j].words)
-			if sim > 0.85 {
+			dist := hammingDistance(candidates[i].fingerprint, candidates[j].fingerprint)
+			if dist <= maxDist {
+				sim := float64(64-dist) / 64.0 * 100
 				if !reported[candidates[i].url] {
 					results = append(results, models.CheckResult{
 						ID:       "body.near_duplicate",
 						Category: "Content",
 						Severity: models.SeverityWarning,
-						Message:  fmt.Sprintf("Near-duplicate content (%.0f%% similarity)", sim*100),
+						Message:  fmt.Sprintf("Near-duplicate content (~%.0f%% similarity, hamming=%d)", sim, dist),
 						URL:      candidates[i].url,
 						Details:  candidates[j].url,
 					})
@@ -151,7 +229,7 @@ func (c *bodyNearDuplicate) Run(pages []*models.PageData) []models.CheckResult {
 						ID:       "body.near_duplicate",
 						Category: "Content",
 						Severity: models.SeverityWarning,
-						Message:  fmt.Sprintf("Near-duplicate content (%.0f%% similarity)", sim*100),
+						Message:  fmt.Sprintf("Near-duplicate content (~%.0f%% similarity, hamming=%d)", sim, dist),
 						URL:      candidates[j].url,
 						Details:  candidates[i].url,
 					})
@@ -163,19 +241,36 @@ func (c *bodyNearDuplicate) Run(pages []*models.PageData) []models.CheckResult {
 	return results
 }
 
-func jaccardSimilarity(a, b map[string]bool) float64 {
-	if len(a) == 0 || len(b) == 0 {
-		return 0
-	}
-	intersection := 0
-	for w := range a {
-		if b[w] {
-			intersection++
+// simhash computes a 64-bit SimHash fingerprint for the given text.
+// Each word (len > 3) is hashed with FNV-64a; the bit-vector is accumulated
+// and collapsed into the final fingerprint.
+func simhash(text string) uint64 {
+	var v [64]int
+	for _, w := range strings.Fields(strings.ToLower(text)) {
+		if len(w) <= 3 {
+			continue
+		}
+		h := fnv.New64a()
+		h.Write([]byte(w))
+		hash := h.Sum64()
+		for i := 0; i < 64; i++ {
+			if hash&(1<<uint(i)) != 0 {
+				v[i]++
+			} else {
+				v[i]--
+			}
 		}
 	}
-	union := len(a) + len(b) - intersection
-	if union == 0 {
-		return 0
+	var fp uint64
+	for i := 0; i < 64; i++ {
+		if v[i] > 0 {
+			fp |= 1 << uint(i)
+		}
 	}
-	return float64(intersection) / float64(union)
+	return fp
+}
+
+// hammingDistance returns the number of differing bits between two uint64 values.
+func hammingDistance(a, b uint64) int {
+	return bits.OnesCount64(a ^ b)
 }

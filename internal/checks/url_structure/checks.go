@@ -13,6 +13,18 @@ var sessionParams = []string{"jsessionid", "sessionid", "phpsessid", "aspsession
 
 var nonDescriptivePattern = regexp.MustCompile(`^/(p|page|post|node|item|product|article|id|detail)s?/\d+/?$`)
 
+// Common English stop words that add no SEO value to URLs.
+var stopWords = map[string]bool{
+	"a": true, "an": true, "the": true, "and": true, "or": true,
+	"but": true, "is": true, "in": true, "on": true, "at": true,
+	"to": true, "for": true, "of": true, "with": true, "by": true,
+	"from": true, "as": true, "into": true, "about": true, "that": true,
+	"this": true, "it": true, "not": true, "are": true, "was": true,
+	"were": true, "been": true, "be": true, "has": true, "have": true,
+	"had": true, "do": true, "does": true, "did": true, "will": true,
+	"would": true, "could": true, "should": true, "may": true, "might": true,
+}
+
 // PageChecks returns per-page URL structure checks.
 func PageChecks() []models.PageCheck {
 	return []models.PageCheck{
@@ -24,6 +36,8 @@ func PageChecks() []models.PageCheck {
 		&urlTooManyParams{},
 		&urlDoubleSlash{},
 		&urlNonDescriptive{},
+		&urlPathDepthTooDeep{},
+		&urlContainsStopWords{},
 	}
 }
 
@@ -171,6 +185,66 @@ func (c *urlNonDescriptive) Run(p *models.PageData) []models.CheckResult {
 			Category: "URL Structure",
 			Severity: models.SeverityNotice,
 			Message:  "URL path is non-descriptive (contains only numeric ID)",
+			URL:      p.URL,
+		}}
+	}
+	return nil
+}
+
+type urlPathDepthTooDeep struct{}
+
+func (c *urlPathDepthTooDeep) Run(p *models.PageData) []models.CheckResult {
+	parsed, err := url.Parse(p.URL)
+	if err != nil {
+		return nil
+	}
+	path := strings.Trim(parsed.Path, "/")
+	if path == "" {
+		return nil
+	}
+	segments := strings.Split(path, "/")
+	if len(segments) > 4 {
+		return []models.CheckResult{{
+			ID:       "url.path_depth_too_deep",
+			Category: "URL Structure",
+			Severity: models.SeverityWarning,
+			Message:  fmt.Sprintf("URL path too deep (%d segments, max 4)", len(segments)),
+			URL:      p.URL,
+		}}
+	}
+	return nil
+}
+
+type urlContainsStopWords struct{}
+
+func (c *urlContainsStopWords) Run(p *models.PageData) []models.CheckResult {
+	parsed, err := url.Parse(p.URL)
+	if err != nil {
+		return nil
+	}
+	path := strings.Trim(parsed.Path, "/")
+	if path == "" {
+		return nil
+	}
+	// Split path into segments, then split each segment by hyphens/underscores
+	segments := strings.Split(path, "/")
+	var found []string
+	for _, seg := range segments {
+		words := strings.FieldsFunc(seg, func(r rune) bool {
+			return r == '-' || r == '_'
+		})
+		for _, w := range words {
+			if stopWords[strings.ToLower(w)] {
+				found = append(found, strings.ToLower(w))
+			}
+		}
+	}
+	if len(found) > 0 {
+		return []models.CheckResult{{
+			ID:       "url.contains_stop_words",
+			Category: "URL Structure",
+			Severity: models.SeverityNotice,
+			Message:  fmt.Sprintf("URL contains stop words: %s", strings.Join(found, ", ")),
 			URL:      p.URL,
 		}}
 	}

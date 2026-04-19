@@ -46,14 +46,46 @@ type SiteCheck interface {
 	Run(pages []*PageData) []CheckResult
 }
 
+// LinkPosition classifies where on a page a link appears.
+type LinkPosition string
+
+const (
+	PositionHeader  LinkPosition = "header"
+	PositionNav     LinkPosition = "nav"
+	PositionContent LinkPosition = "content"
+	PositionFooter  LinkPosition = "footer"
+	PositionSidebar LinkPosition = "sidebar"
+)
+
 // Link represents a hyperlink found on a page
 type Link struct {
-	URL        string `json:"url"`
-	Text       string `json:"text"`
-	Rel        string `json:"rel"`
-	IsInternal bool   `json:"is_internal"`
-	IsFollow   bool   `json:"is_follow"`
-	StatusCode int    `json:"status_code,omitempty"`
+	URL        string       `json:"url"`
+	Text       string       `json:"text"`
+	Rel        string       `json:"rel"`
+	IsInternal bool         `json:"is_internal"`
+	IsFollow   bool         `json:"is_follow"`
+	Position   LinkPosition `json:"position,omitempty"`
+	StatusCode int          `json:"status_code,omitempty"`
+	Timeout    bool         `json:"timeout,omitempty"`
+}
+
+// ResourceType classifies a sub-resource discovered on a page.
+type ResourceType string
+
+const (
+	ResourceScript ResourceType = "script"
+	ResourceCSS    ResourceType = "css"
+	ResourceFont   ResourceType = "font"
+)
+
+// Resource represents a sub-resource (CSS, JS, or font) referenced by a page.
+type Resource struct {
+	URL         string       `json:"url"`
+	Type        ResourceType `json:"type"`
+	StatusCode  int          `json:"status_code,omitempty"`
+	FileSize    int64        `json:"file_size,omitempty"`
+	ContentType string       `json:"content_type,omitempty"`
+	IsInternal  bool         `json:"is_internal"`
 }
 
 // Image represents an <img> element
@@ -67,6 +99,9 @@ type Image struct {
 	HasSrcset   bool   `json:"has_srcset"`
 	IsAboveFold bool   `json:"is_above_fold"`
 	StatusCode  int    `json:"status_code,omitempty"`
+	FileSize    int64  `json:"file_size,omitempty"`    // bytes, from HEAD/GET response
+	Format      string `json:"format,omitempty"`       // e.g. "jpg", "webp", "avif", "png"
+	ContentType string `json:"content_type,omitempty"` // from Content-Type header
 }
 
 // Hreflang represents an alternate language link
@@ -96,14 +131,19 @@ type PageData struct {
 	H3s                   []string          `json:"h3s"`
 	Canonical             string            `json:"canonical"`
 	RobotsTag             string            `json:"robots_tag"`
+	RobotsDirectives      []string          `json:"robots_directives,omitempty"`
+	XRobotsTag            string            `json:"x_robots_tag,omitempty"`
 	RedirectChain         []RedirectHop     `json:"redirect_chain,omitempty"`
 	Links                 []Link            `json:"links"`
 	Images                []Image           `json:"images"`
+	Resources             []Resource        `json:"resources,omitempty"`
+	FontFaceNoDisplay     int               `json:"font_face_no_display,omitempty"`
 	SchemaJSONRaw         []string          `json:"schema_json_raw"`
 	OGTags                map[string]string `json:"og_tags"`
 	TwitterTags           map[string]string `json:"twitter_tags"`
 	HreflangTags          []Hreflang        `json:"hreflang_tags"`
 	Depth                 int               `json:"depth"`
+	InlinkCount           int               `json:"inlink_count"`
 	IsInternal            bool              `json:"is_internal"`
 	InSitemap             bool              `json:"in_sitemap"`
 	CheckResults          []CheckResult     `json:"check_results"`
@@ -121,6 +161,20 @@ type PageData struct {
 	ViewportContent       string            `json:"viewport_content"`
 	// Mobile comparison data
 	MobileData            *MobilePageData   `json:"mobile_data,omitempty"`
+	// TLS / SSL certificate info
+	TLSInfo               *TLSInfo          `json:"tls_info,omitempty"`
+}
+
+// TLSInfo holds TLS connection and certificate details captured during fetch.
+type TLSInfo struct {
+	Version       string    `json:"version"`                  // e.g. "TLS 1.3"
+	CipherSuite   string    `json:"cipher_suite"`
+	CertSubject   string    `json:"cert_subject,omitempty"`
+	CertIssuer    string    `json:"cert_issuer,omitempty"`
+	CertNotBefore time.Time `json:"cert_not_before,omitempty"`
+	CertNotAfter  time.Time `json:"cert_not_after,omitempty"`
+	CertDNSNames  []string  `json:"cert_dns_names,omitempty"`
+	ChainLength   int       `json:"chain_length"`
 }
 
 // MobilePageData holds data fetched with a mobile user-agent for comparison
@@ -184,7 +238,9 @@ type CrawlConfig struct {
 	// "" or "all" = run both and show bifurcated report (default).
 	// "desktop" = skip mobile fetch, only surface desktop issues.
 	// "mobile"  = only surface mobile + diff issues.
-	Platform Platform
+	Platform              Platform
+	ValidateExternalLinks bool
+	DiscoverResources     bool
 	// OnProgress is called after each page is successfully crawled.
 	// crawled = total pages done so far; currentURL = the URL just processed.
 	// Safe to leave nil.

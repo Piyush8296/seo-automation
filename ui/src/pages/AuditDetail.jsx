@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Play, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Play, AlertCircle, Table as TableIcon, FileText } from 'lucide-react'
 import { useSSE } from '../hooks/useSSE'
 import { api } from '../lib/api'
 import CrawlProgress from '../components/CrawlProgress'
 import ScoreCard from '../components/ScoreCard'
 import IssueSummary from '../components/IssueSummary'
 import ReportViewer from '../components/ReportViewer'
+import IssueTable from '../components/IssueTable'
 import StatusBadge from '../components/StatusBadge'
 
 export default function AuditDetail() {
@@ -14,6 +15,7 @@ export default function AuditDetail() {
   const navigate = useNavigate()
   const [audit, setAudit] = useState(null)
   const [loadErr, setLoadErr] = useState('')
+  const [reportTab, setReportTab] = useState('table') // 'table' | 'html'
 
   // Load initial record
   useEffect(() => {
@@ -155,8 +157,29 @@ export default function AuditDetail() {
               pages={pages}
             />
 
-            {/* Report iframe */}
-            <ReportViewer auditId={id} />
+            {/* Report — tabbed view */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-1 border-b border-gray-800">
+                <TabButton
+                  active={reportTab === 'table'}
+                  onClick={() => setReportTab('table')}
+                  icon={TableIcon}
+                  label="Issue Table"
+                />
+                <TabButton
+                  active={reportTab === 'html'}
+                  onClick={() => setReportTab('html')}
+                  icon={FileText}
+                  label="HTML Report"
+                />
+              </div>
+
+              {reportTab === 'table' ? (
+                <IssueTable auditId={id} />
+              ) : (
+                <ReportViewer auditId={id} />
+              )}
+            </div>
           </>
         )}
 
@@ -178,5 +201,21 @@ export default function AuditDetail() {
         </div>
       </main>
     </div>
+  )
+}
+
+function TabButton({ active, onClick, icon: Icon, label }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+        active
+          ? 'text-emerald-400 border-emerald-500'
+          : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-700'
+      }`}
+    >
+      <Icon size={14} />
+      {label}
+    </button>
   )
 }
