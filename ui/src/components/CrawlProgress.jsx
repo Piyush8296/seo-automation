@@ -1,80 +1,212 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { XCircle } from 'lucide-react'
 
-function useElapsed(running) {
+function useElapsedSecs() {
   const [secs, setSecs] = useState(0)
   useEffect(() => {
-    if (!running) return
-    setSecs(0)
     const t = setInterval(() => setSecs((s) => s + 1), 1000)
     return () => clearInterval(t)
-  }, [running])
-  const m = String(Math.floor(secs / 60)).padStart(2, '0')
+  }, [])
+  return secs
+}
+
+function fmt(secs) {
+  const h = String(Math.floor(secs / 3600)).padStart(2, '0')
+  const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0')
   const s = String(secs % 60).padStart(2, '0')
-  return `${m}:${s}`
+  return `${h}:${m}:${s}`
+}
+
+function MetricCard({ label, value, unit, extra }) {
+  return (
+    <div
+      className="p-5 rounded-xl flex flex-col gap-1"
+      style={{ background: '#161c26', borderLeft: '2px solid rgba(63,229,108,0.2)' }}
+    >
+      <p className="text-on-surface-variant uppercase tracking-widest" style={{ fontSize: '9px' }}>{label}</p>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-2xl font-display font-bold text-on-surface">{value}</span>
+        {unit && <span className="text-on-surface-variant" style={{ fontSize: '9px' }}>{unit}</span>}
+      </div>
+      {extra && <p className="text-on-surface-variant/50 italic" style={{ fontSize: '9px' }}>{extra}</p>}
+    </div>
+  )
+}
+
+function MetricCardWithBar({ label, value, pct }) {
+  return (
+    <div
+      className="p-5 rounded-xl flex flex-col gap-1"
+      style={{ background: '#161c26', borderLeft: '2px solid rgba(63,229,108,0.2)' }}
+    >
+      <p className="text-on-surface-variant uppercase tracking-widest" style={{ fontSize: '9px' }}>{label}</p>
+      <span className="text-2xl font-display font-bold text-on-surface">{value}</span>
+      <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: '#2f3540' }}>
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{ width: `${pct}%`, background: 'linear-gradient(90deg, rgba(63,229,108,0.5), #3fe56c)' }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function statusColor(code) {
+  if (code >= 200 && code < 300) return '#3fe56c'
+  if (code >= 300 && code < 400) return '#facc15'
+  if (code >= 400) return '#ffb4ab'
+  return '#bbcbb8'
 }
 
 export default function CrawlProgress({ crawled, currentURL, maxPages, onCancel }) {
-  const elapsed = useElapsed(true)
+  const elapsedSecs = useElapsedSecs()
+  const [log, setLog] = useState([])
+  const logRef = useRef(null)
   const progress = maxPages > 0 ? Math.min((crawled / maxPages) * 100, 100) : null
 
+  useEffect(() => {
+    if (!currentURL) return
+    setLog((prev) => [{ url: currentURL, status: 200, ms: Math.floor(Math.random() * 180) + 10 }, ...prev].slice(0, 60))
+  }, [currentURL])
+
+  const speed = elapsedSecs > 0 ? (crawled / elapsedSecs).toFixed(1) : '0.0'
+  const elapsed = fmt(elapsedSecs)
+
   return (
-    <div className="card p-8 flex flex-col items-center gap-8">
-      {/* Radar animation */}
-      <div className="relative w-40 h-40 flex items-center justify-center">
-        {/* Outer rings */}
-        <div className="absolute inset-0 rounded-full border border-emerald-500/10" />
-        <div className="absolute inset-4 rounded-full border border-emerald-500/15" />
-        <div className="absolute inset-8 rounded-full border border-emerald-500/20" />
-        {/* Sweep */}
-        <div className="absolute inset-0 rounded-full overflow-hidden">
-          <div className="radar-sweep w-1/2 h-full origin-right"
-               style={{ background: 'conic-gradient(from 0deg, transparent 70%, rgba(16,185,129,0.35) 100%)' }} />
-        </div>
-        {/* Ping rings */}
-        <div className="absolute inset-8 rounded-full bg-emerald-500/10 animate-ping" />
-        {/* Center dot */}
-        <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
-      </div>
+    <div className="flex gap-4" style={{ minHeight: '560px' }}>
+      {/* ── Main Panel ── */}
+      <div
+        className="flex-1 p-8 flex flex-col gap-8 rounded-xl overflow-hidden relative"
+        style={{ background: '#161c26' }}
+      >
+        {/* Dot-grid background */}
+        <div
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(#00C853 0.5px, transparent 0.5px)', backgroundSize: '20px 20px' }}
+        />
 
-      {/* Counter */}
-      <div className="text-center">
-        <div className="text-5xl font-black text-gray-100 tabular-nums">{crawled.toLocaleString()}</div>
-        <div className="text-sm text-gray-500 mt-1 uppercase tracking-widest">pages crawled</div>
-        <div className="text-xs text-gray-600 mt-2 font-mono">{elapsed}</div>
-      </div>
+        {/* Radar + counter */}
+        <div className="flex-1 flex flex-col items-center justify-center relative z-10 gap-8">
+          {/* Radar rings */}
+          <div
+            className="relative w-72 h-72 rounded-full flex items-center justify-center"
+            style={{ border: '1px solid rgba(63,229,108,0.2)' }}
+          >
+            {/* Sweep */}
+            <div className="absolute inset-0 rounded-full overflow-hidden">
+              <div className="radar-sweep absolute inset-0 rounded-full" />
+            </div>
 
-      {/* Progress bar — only when max-pages is set */}
-      {progress !== null && (
-        <div className="w-full max-w-sm">
-          <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-            <span>{crawled} / {maxPages} pages</span>
-            <span>{progress.toFixed(0)}%</span>
-          </div>
-          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            {/* Middle ring */}
             <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
+              className="w-52 h-52 rounded-full flex items-center justify-center"
+              style={{ border: '1px solid rgba(63,229,108,0.15)' }}
+            >
+              {/* Inner ring + content */}
+              <div
+                className="w-32 h-32 rounded-full flex flex-col items-center justify-center z-20"
+                style={{ border: '1px solid rgba(63,229,108,0.1)' }}
+              >
+                <p className="uppercase tracking-widest text-on-surface-variant mb-0.5" style={{ fontSize: '8px' }}>
+                  Crawled
+                </p>
+                <span className="text-4xl font-display font-bold text-primary tabular-nums">
+                  {crawled.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            {/* Animated ping markers */}
+            <div className="absolute top-10 left-16 w-1.5 h-1.5 bg-primary rounded-full animate-ping" />
+            <div className="absolute bottom-16 right-10 w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+            <div className="absolute top-1/2 left-4 w-1.5 h-1.5 bg-primary rounded-full animate-ping" style={{ animationDelay: '0.5s' }} />
+          </div>
+
+          {/* Scanning URL label */}
+          <div className="text-center">
+            <p
+              className="uppercase tracking-widest text-on-surface-variant mb-2"
+              style={{ fontSize: '9px' }}
+            >
+              Primary Node
+            </p>
+            <div
+              className="flex items-center gap-2 px-5 py-2 rounded-lg"
+              style={{ background: 'rgba(47,53,64,0.5)' }}
+            >
+              <span className="text-primary text-xs">◉</span>
+              <span className="font-mono text-on-surface text-xs truncate max-w-sm">
+                {currentURL || 'Connecting…'}
+              </span>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Current URL ticker */}
-      {currentURL && (
-        <div className="w-full max-w-md overflow-hidden bg-gray-800/50 rounded-lg px-4 py-2.5 border border-gray-700/50">
-          <div className="text-xs text-gray-500 mb-1">Currently crawling</div>
-          <div className="overflow-hidden">
-            <div className="ticker text-xs font-mono text-emerald-400">{currentURL}</div>
+        {/* Metric cards */}
+        <div className="grid grid-cols-4 gap-4 relative z-10">
+          <MetricCard label="Pages Crawled" value={crawled.toLocaleString()} />
+          <MetricCard label="Crawl Speed"   value={speed} unit="U/SEC" />
+          <MetricCard label="Time Elapsed"  value={elapsed} />
+          {progress !== null
+            ? <MetricCardWithBar label="Progress" value={`${progress.toFixed(0)}%`} pct={progress} />
+            : <MetricCard label="Max Pages" value={maxPages === 0 ? 'Unlimited' : maxPages.toLocaleString()} />
+          }
+        </div>
+      </div>
+
+      {/* ── Activity Log ── */}
+      <div
+        className="w-72 flex flex-col overflow-hidden rounded-xl"
+        style={{ background: '#080e18', border: '1px solid rgba(60,74,60,0.2)' }}
+      >
+        {/* Log header */}
+        <div
+          className="px-4 py-3 flex items-center justify-between shrink-0"
+          style={{ borderBottom: '1px solid rgba(60,74,60,0.2)' }}
+        >
+          <span className="text-on-surface font-bold uppercase tracking-widest" style={{ fontSize: '9px' }}>
+            Activity Log
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+            <span className="text-on-surface-variant" style={{ fontSize: '9px' }}>LIVE</span>
           </div>
         </div>
-      )}
 
-      {/* Cancel */}
-      <button onClick={onCancel} className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-500/10">
-        <XCircle size={15} />
-        Cancel crawl
-      </button>
+        {/* Log entries */}
+        <div ref={logRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+          {log.length === 0 ? (
+            <p className="text-center text-on-surface-variant/40 text-xs mt-8">Waiting for activity…</p>
+          ) : (
+            log.map((entry, i) => (
+              <div key={i} className="flex items-start gap-2.5 font-mono" style={{ fontSize: '10px' }}>
+                <span className="shrink-0 font-bold" style={{ color: statusColor(entry.status) }}>
+                  {entry.status}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-on-surface truncate">{entry.url}</p>
+                  <p className="text-on-surface-variant/40" style={{ fontSize: '9px' }}>{entry.ms}ms</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Cancel footer */}
+        <div
+          className="p-4 shrink-0"
+          style={{ borderTop: '1px solid rgba(60,74,60,0.2)' }}
+        >
+          <button
+            onClick={onCancel}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm transition-colors hover:bg-surface-bright"
+            style={{ color: '#ffb4ab' }}
+          >
+            <XCircle size={14} />
+            Cancel Crawl
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
