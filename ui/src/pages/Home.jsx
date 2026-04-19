@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Settings, Globe2, ChevronDown, ChevronUp, CheckSquare, Database } from 'lucide-react'
+import { Play, Settings, Globe2, ChevronDown, ChevronUp, CheckSquare, Database, Info } from 'lucide-react'
 import { api } from '../lib/api'
 
 const DEFAULTS = {
@@ -15,6 +15,79 @@ const DEFAULTS = {
   discover_resources: true,
 }
 
+const TIPS = {
+  url:                    'The root URL to start crawling from. All pages within the same domain will be discovered and audited.',
+  max_depth:              'How many link-hops away from the root URL to crawl. Unlimited follows every internal link regardless of depth.',
+  max_pages:              'Hard cap on the total number of pages crawled. Unlimited means the entire site will be processed.',
+  timeout:                'Maximum time allowed per individual HTTP request. Increase for slow servers.',
+  concurrency:            'Number of pages fetched in parallel. Higher values finish faster but put more load on the target server.',
+  platform:               'Choose "Both" to run a full desktop + mobile bifurcated audit. "Desktop only" skips the mobile fetch. "Mobile focus" surfaces only mobile and mobile-vs-desktop issues.',
+  output_dir:             'Folder where HTML, JSON and Markdown reports are saved. Defaults to ~/.seo-reports if left blank.',
+  validate_external_links:'Sends a HEAD request to every outbound link to check for broken URLs. Significantly increases total crawl time.',
+  discover_resources:     'Validates every CSS, JavaScript and font file referenced by crawled pages. Very slow on large sites.',
+}
+
+function Tooltip({ text }) {
+  const [visible, setVisible] = useState(false)
+  const [pos, setPos] = useState('top')
+  const ref = useRef(null)
+
+  const show = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect()
+      setPos(rect.top < 80 ? 'bottom' : 'top')
+    }
+    setVisible(true)
+  }
+
+  return (
+    <span
+      ref={ref}
+      className="relative inline-flex items-center"
+      onMouseEnter={show}
+      onMouseLeave={() => setVisible(false)}
+    >
+      <Info size={11} className="text-on-surface-variant/50 hover:text-on-surface-variant cursor-help transition-colors" />
+      {visible && (
+        <span
+          className="absolute z-50 w-64 rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
+          style={{
+            background: '#1a202a',
+            border: '1px solid rgba(60,74,60,0.5)',
+            color: '#bbcbb8',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            ...(pos === 'top'
+              ? { bottom: 'calc(100% + 8px)' }
+              : { top: 'calc(100% + 8px)' }),
+          }}
+        >
+          {text}
+          <span
+            className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rotate-45"
+            style={{
+              background: '#1a202a',
+              border: '1px solid rgba(60,74,60,0.5)',
+              ...(pos === 'top'
+                ? { bottom: '-5px', borderTop: 'none', borderLeft: 'none' }
+                : { top: '-5px', borderBottom: 'none', borderRight: 'none' }),
+            }}
+          />
+        </span>
+      )}
+    </span>
+  )
+}
+
+function Label({ children, tip }) {
+  return (
+    <label className="label mb-2 flex items-center gap-1.5">
+      {children}
+      {tip && <Tooltip text={tip} />}
+    </label>
+  )
+}
 
 export default function Home() {
   const [starting, setStarting] = useState(false)
@@ -56,7 +129,7 @@ export default function Home() {
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
 
-      {/* ── Left Sidebar: nav + audit history ── */}
+      {/* ── Left Sidebar: nav ── */}
       <aside
         className="w-64 flex flex-col shrink-0 h-full"
         style={{ background: '#161c26' }}
@@ -83,18 +156,18 @@ export default function Home() {
               <span className="uppercase tracking-widest font-medium" style={{ fontSize: '9px' }}>Observatory</span>
             </div>
             <button
-              onClick={() => navigate('/settings')}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
-            >
-              <Settings size={15} />
-              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Settings</span>
-            </button>
-            <button
               onClick={() => navigate('/vault')}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
             >
               <Database size={15} />
               <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Audit Vault</span>
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <Settings size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Settings</span>
             </button>
             <button
               onClick={() => navigate('/checks')}
@@ -140,9 +213,9 @@ export default function Home() {
         <main className="flex-1 overflow-y-auto p-8">
           <form onSubmit={handleStart} className="max-w-2xl mx-auto flex flex-col gap-6">
 
-            {/* URL input — hero input */}
+            {/* URL input */}
             <div>
-              <label className="label mb-2">Target Domain URL</label>
+              <Label tip={TIPS.url}>Target Domain URL</Label>
               <div className="relative">
                 <input
                   type="url"
@@ -163,7 +236,7 @@ export default function Home() {
             {/* Crawl parameter grid */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="label">Crawl Depth</label>
+                <Label tip={TIPS.max_depth}>Crawl Depth</Label>
                 <select value={form.max_depth} onChange={(e) => set('max_depth', e.target.value)} className="input" disabled={starting}>
                   <option value={-1}>Unlimited</option>
                   <option value={1}>1 level</option>
@@ -173,7 +246,7 @@ export default function Home() {
                 </select>
               </div>
               <div>
-                <label className="label">Max Pages</label>
+                <Label tip={TIPS.max_pages}>Max Pages</Label>
                 <select value={form.max_pages} onChange={(e) => set('max_pages', e.target.value)} className="input" disabled={starting}>
                   <option value={0}>Unlimited</option>
                   <option value={50}>50</option>
@@ -183,7 +256,7 @@ export default function Home() {
                 </select>
               </div>
               <div>
-                <label className="label">Timeout</label>
+                <Label tip={TIPS.timeout}>Timeout</Label>
                 <select value={form.timeout} onChange={(e) => set('timeout', e.target.value)} className="input" disabled={starting}>
                   <option value="10s">10 seconds</option>
                   <option value="30s">30 seconds</option>
@@ -195,7 +268,7 @@ export default function Home() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="label">Concurrent Workers — {form.concurrency}</label>
+                <Label tip={TIPS.concurrency}>Concurrent Workers — {form.concurrency}</Label>
                 <input
                   type="range" min={1} max={20} step={1}
                   value={form.concurrency}
@@ -209,7 +282,7 @@ export default function Home() {
                 </div>
               </div>
               <div>
-                <label className="label">Platform</label>
+                <Label tip={TIPS.platform}>Platform</Label>
                 <select value={form.platform} onChange={(e) => set('platform', e.target.value)} className="input" disabled={starting}>
                   <option value="">Both (bifurcated)</option>
                   <option value="desktop">Desktop only</option>
@@ -231,7 +304,7 @@ export default function Home() {
             {advanced && (
               <div className="flex flex-col gap-4 rounded-xl p-5" style={{ background: '#161c26' }}>
                 <div>
-                  <label className="label">Custom output directory</label>
+                  <Label tip={TIPS.output_dir}>Custom output directory</Label>
                   <input
                     type="text"
                     placeholder="~/.seo-reports (default)"
@@ -252,7 +325,10 @@ export default function Home() {
                       disabled={starting}
                     />
                     <div>
-                      <div className="text-sm text-on-surface">Validate external links</div>
+                      <div className="text-sm text-on-surface flex items-center gap-1.5">
+                        Validate external links
+                        <Tooltip text={TIPS.validate_external_links} />
+                      </div>
                       <div className="text-xs text-on-surface-variant">HEAD-check every outbound link. Adds crawl time.</div>
                     </div>
                   </label>
@@ -266,7 +342,10 @@ export default function Home() {
                       disabled={starting}
                     />
                     <div>
-                      <div className="text-sm text-on-surface">Discover sub-resources (CSS, JS, fonts)</div>
+                      <div className="text-sm text-on-surface flex items-center gap-1.5">
+                        Discover sub-resources (CSS, JS, fonts)
+                        <Tooltip text={TIPS.discover_resources} />
+                      </div>
                       <div className="text-xs text-on-surface-variant">Validates stylesheets, scripts and fonts. Slow.</div>
                     </div>
                   </label>
