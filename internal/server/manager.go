@@ -16,10 +16,14 @@ import (
 )
 
 const (
-	defaultUserAgent = "SEOAuditBot/1.0 (+https://github.com/cars24/seo-automation)"
-	defaultMobileUA  = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-	defaultTimeout   = "30s"
-	defaultConcur    = 5
+	defaultUserAgent           = "SEOAuditBot/1.0 (+https://github.com/cars24/seo-automation)"
+	defaultMobileUA            = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+	defaultTimeout             = "30s"
+	defaultConcur              = 5
+	defaultScope               = models.CrawlScopeHost
+	defaultSitemapMode         = models.SitemapModeDiscover
+	defaultMaxRedirects        = 10
+	defaultMaxPageSizeKB int64 = 5 * 1024
 )
 
 // Manager orchestrates the lifecycle of audit runs.
@@ -55,6 +59,24 @@ func (m *Manager) StartAudit(req StartAuditRequest) (*AuditRecord, error) {
 	}
 	if req.Timeout == "" {
 		req.Timeout = defaultTimeout
+	}
+	if strings.TrimSpace(req.Scope) == "" {
+		req.Scope = string(defaultScope)
+	}
+	if strings.TrimSpace(req.SitemapMode) == "" {
+		req.SitemapMode = string(defaultSitemapMode)
+	}
+	if strings.TrimSpace(req.UserAgent) == "" {
+		req.UserAgent = defaultUserAgent
+	}
+	if strings.TrimSpace(req.MobileUserAgent) == "" {
+		req.MobileUserAgent = defaultMobileUA
+	}
+	if req.MaxRedirects <= 0 {
+		req.MaxRedirects = defaultMaxRedirects
+	}
+	if req.MaxPageSizeKB <= 0 {
+		req.MaxPageSizeKB = defaultMaxPageSizeKB
 	}
 
 	timeout, err := time.ParseDuration(req.Timeout)
@@ -112,20 +134,54 @@ func (m *Manager) runAudit(ctx context.Context, id string, req StartAuditRequest
 	if platform == "all" {
 		platform = ""
 	}
+	scope := models.CrawlScope(strings.ToLower(strings.TrimSpace(req.Scope)))
+	if scope == "" {
+		scope = defaultScope
+	}
+	sitemapMode := models.SitemapMode(strings.ToLower(strings.TrimSpace(req.SitemapMode)))
+	if sitemapMode == "" {
+		sitemapMode = defaultSitemapMode
+	}
 	noMobile := platform == models.PlatformDesktop
+	respectRobots := true
+	if req.RespectRobots != nil {
+		respectRobots = *req.RespectRobots
+	}
+	expandNoindex := true
+	if req.ExpandNoindexPages != nil {
+		expandNoindex = *req.ExpandNoindexPages
+	}
+	expandCanonical := true
+	if req.ExpandCanonicalizedPages != nil {
+		expandCanonical = *req.ExpandCanonicalizedPages
+	}
 
 	config := &models.CrawlConfig{
-		SeedURL:       req.URL,
-		MaxDepth:      req.MaxDepth,
-		MaxPages:      req.MaxPages,
-		Concurrency:   req.Concurrency,
-		Timeout:       timeout,
-		NoMobileCheck: noMobile,
-		UserAgent:     defaultUserAgent,
-		MobileUA:      defaultMobileUA,
-		Platform:              platform,
-		ValidateExternalLinks: req.ValidateExternalLinks,
-		DiscoverResources:     req.DiscoverResources,
+		SeedURL:                  req.URL,
+		SitemapURL:               req.SitemapURL,
+		Scope:                    scope,
+		ScopePrefix:              req.ScopePrefix,
+		SitemapMode:              sitemapMode,
+		MaxDepth:                 req.MaxDepth,
+		MaxPages:                 req.MaxPages,
+		Concurrency:              req.Concurrency,
+		Timeout:                  timeout,
+		NoMobileCheck:            noMobile,
+		UserAgent:                req.UserAgent,
+		MobileUA:                 req.MobileUserAgent,
+		RespectRobots:            respectRobots,
+		MaxRedirects:             req.MaxRedirects,
+		MaxPageSizeBytes:         req.MaxPageSizeKB * 1024,
+		MaxURLLength:             req.MaxURLLength,
+		MaxQueryParams:           req.MaxQueryParams,
+		MaxLinksPerPage:          req.MaxLinksPerPage,
+		FollowNofollowLinks:      req.FollowNofollowLinks,
+		ExpandNoindexPages:       expandNoindex,
+		ExpandCanonicalizedPages: expandCanonical,
+		RenderMode:               "html-only",
+		Platform:                 platform,
+		ValidateExternalLinks:    req.ValidateExternalLinks,
+		DiscoverResources:        req.DiscoverResources,
 		OnProgress: func(crawled int, currentURL string) {
 			m.hub.Broadcast(id, ProgressEvent{
 				Type:         "progress",

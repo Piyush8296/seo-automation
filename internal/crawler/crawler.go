@@ -18,10 +18,10 @@ type Crawler struct {
 
 // NewCrawler creates a Crawler with the given config.
 func NewCrawler(config *models.CrawlConfig) *Crawler {
-	fetcher := NewFetcher(config.Timeout, config.UserAgent)
+	fetcher := NewFetcher(config.Timeout, config.UserAgent, config.MaxRedirects, config.MaxPageSizeBytes)
 	var mobileFetcher *Fetcher
 	if !config.NoMobileCheck && config.MobileUA != "" {
-		mobileFetcher = NewFetcher(config.Timeout, config.MobileUA)
+		mobileFetcher = NewFetcher(config.Timeout, config.MobileUA, config.MaxRedirects, config.MaxPageSizeBytes)
 	}
 	return &Crawler{
 		config:        config,
@@ -39,8 +39,12 @@ type crawlItem struct {
 // Crawl performs the full BFS crawl and returns a SiteAudit.
 func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 	audit := &models.SiteAudit{
-		SiteURL:   c.config.SeedURL,
-		CrawledAt: time.Now(),
+		SiteURL:     c.config.SeedURL,
+		CrawledAt:   time.Now(),
+		CrawlConfig: c.config.Snapshot(),
+	}
+	if audit.CrawlConfig.Scope == models.CrawlScopeSubfolder && audit.CrawlConfig.ScopePrefix == "" {
+		audit.CrawlConfig.ScopePrefix = effectiveScopePrefix(c.config)
 	}
 
 	// Check robots.txt metadata
@@ -50,11 +54,11 @@ func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 
 	// Fetch sitemap URLs
 	sitemapURL := c.config.SitemapURL
-	if sitemapURL == "" {
+	if c.config.SitemapMode != models.SitemapModeOff && sitemapURL == "" {
 		sitemapURL = DiscoverSitemapURL(ctx, c.fetcher, c.robotsCache, c.config.SeedURL)
 	}
 	sitemapSet := make(map[string]bool)
-	if sitemapURL != "" {
+	if c.config.SitemapMode != models.SitemapModeOff && sitemapURL != "" {
 		entries, _ := FetchSitemapURLs(ctx, c.fetcher, sitemapURL)
 		for _, e := range entries {
 			key := DedupeKey(e.URL)
@@ -66,18 +70,36 @@ func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 
 	// BFS queue
 	queue := make(chan crawlItem, 10000)
-	queue <- crawlItem{url: DedupeKey(c.config.SeedURL), depth: 0}
 
 	var (
-		visited   sync.Map
-		pagesMu   sync.Mutex
-		pages     []*models.PageData
-		wg        sync.WaitGroup
-		pageCnt   int
-		sem       = make(chan struct{}, c.config.Concurrency)
+		visited sync.Map
+		pagesMu sync.Mutex
+		pages   []*models.PageData
+		wg      sync.WaitGroup
+		pageCnt int
+		sem     = make(chan struct{}, c.config.Concurrency)
 	)
 
-	visited.Store(DedupeKey(c.config.SeedURL), true)
+	enqueue := func(rawURL string, depth int) {
+		key := DedupeKey(rawURL)
+		if !shouldCrawlURL(key, c.config) {
+			return
+		}
+		if _, loaded := visited.LoadOrStore(key, true); loaded {
+			return
+		}
+		select {
+		case queue <- crawlItem{url: key, depth: depth}:
+		default:
+		}
+	}
+
+	enqueue(c.config.SeedURL, 0)
+	if c.config.SitemapMode == models.SitemapModeSeed {
+		for _, sitemapURL := range audit.SitemapURLs {
+			enqueue(sitemapURL, 0)
+		}
+	}
 
 	// Drain queue until empty and all workers done
 	for {
@@ -120,10 +142,6 @@ func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 
 				// Enqueue discovered URLs
 				for _, discovered := range result.DiscoveredURLs {
-					key := DedupeKey(discovered)
-					if _, loaded := visited.LoadOrStore(key, true); loaded {
-						continue
-					}
 					nextDepth := ci.depth + 1
 					if c.config.MaxDepth >= 0 && nextDepth > c.config.MaxDepth {
 						continue
@@ -134,10 +152,7 @@ func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 					if exceeded {
 						continue
 					}
-					select {
-					case queue <- crawlItem{url: key, depth: nextDepth}:
-					default:
-					}
+					enqueue(discovered, nextDepth)
 				}
 			}(item)
 

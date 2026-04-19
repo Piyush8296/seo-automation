@@ -27,6 +27,37 @@ func WriteMarkdown(audit *models.SiteAudit, outputDir string) (string, error) {
 	sb.WriteString(fmt.Sprintf("| Notices | %d |\n", audit.Stats.Notices))
 	sb.WriteString(fmt.Sprintf("| Total Checks Run | %d |\n\n", audit.Stats.TotalChecksRun))
 
+	sb.WriteString("## Crawl Setup\n\n")
+	sb.WriteString("| Setting | Value |\n")
+	sb.WriteString("|---|---|\n")
+	sb.WriteString(fmt.Sprintf("| Seed URL | %s |\n", audit.CrawlConfig.SeedURL))
+	sb.WriteString(fmt.Sprintf("| Scope | %s |\n", audit.CrawlConfig.Scope))
+	scopePrefix := audit.CrawlConfig.ScopePrefix
+	if scopePrefix == "" {
+		scopePrefix = "—"
+	}
+	sb.WriteString(fmt.Sprintf("| Scope Prefix | %s |\n", scopePrefix))
+	sb.WriteString(fmt.Sprintf("| Sitemap Mode | %s |\n", audit.CrawlConfig.SitemapMode))
+	sitemapURL := audit.CrawlConfig.SitemapURL
+	if sitemapURL == "" {
+		sitemapURL = "auto / none"
+	}
+	sb.WriteString(fmt.Sprintf("| Sitemap URL | %s |\n", sitemapURL))
+	sb.WriteString(fmt.Sprintf("| Max Depth | %d |\n", audit.CrawlConfig.MaxDepth))
+	sb.WriteString(fmt.Sprintf("| Max Pages | %d |\n", audit.CrawlConfig.MaxPages))
+	sb.WriteString(fmt.Sprintf("| Concurrency | %d |\n", audit.CrawlConfig.Concurrency))
+	sb.WriteString(fmt.Sprintf("| Timeout | %s |\n", audit.CrawlConfig.Timeout))
+	sb.WriteString(fmt.Sprintf("| Respect Robots | %t |\n", audit.CrawlConfig.RespectRobots))
+	sb.WriteString(fmt.Sprintf("| Max Redirects | %d |\n", audit.CrawlConfig.MaxRedirects))
+	sb.WriteString(fmt.Sprintf("| Max Page Size (KB) | %d |\n", audit.CrawlConfig.MaxPageSizeKB))
+	sb.WriteString(fmt.Sprintf("| Max URL Length | %d |\n", audit.CrawlConfig.MaxURLLength))
+	sb.WriteString(fmt.Sprintf("| Max Query Params | %d |\n", audit.CrawlConfig.MaxQueryParams))
+	sb.WriteString(fmt.Sprintf("| Max Links Per Page | %d |\n", audit.CrawlConfig.MaxLinksPerPage))
+	sb.WriteString(fmt.Sprintf("| Follow Nofollow Links | %t |\n", audit.CrawlConfig.FollowNofollowLinks))
+	sb.WriteString(fmt.Sprintf("| Expand Noindex Pages | %t |\n", audit.CrawlConfig.ExpandNoindexPages))
+	sb.WriteString(fmt.Sprintf("| Expand Canonicalized Pages | %t |\n", audit.CrawlConfig.ExpandCanonicalizedPages))
+	sb.WriteString(fmt.Sprintf("| Render Mode | %s |\n\n", audit.CrawlConfig.RenderMode))
+
 	// Collect all issues
 	type issueEntry struct {
 		result models.CheckResult

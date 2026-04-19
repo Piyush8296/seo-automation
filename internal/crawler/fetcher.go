@@ -11,29 +11,37 @@ import (
 	"github.com/cars24/seo-automation/internal/models"
 )
 
-const maxBodyBytes = 5 * 1024 * 1024 // 5 MB
+const defaultMaxBodyBytes int64 = 5 * 1024 * 1024 // 5 MB
 
 // FetchResult holds the result of fetching a single URL.
 type FetchResult struct {
-	URL           string
-	FinalURL      string
-	StatusCode    int
-	Headers       http.Header
-	Body          []byte
+	URL            string
+	FinalURL       string
+	StatusCode     int
+	Headers        http.Header
+	Body           []byte
 	ResponseTimeMs int64
-	RedirectChain []models.RedirectHop
-	TLSInfo       *models.TLSInfo
-	Error         string
+	RedirectChain  []models.RedirectHop
+	TLSInfo        *models.TLSInfo
+	Error          string
 }
 
 // Fetcher wraps an http.Client with redirect-chain tracking.
 type Fetcher struct {
-	client    *http.Client
-	UserAgent string
+	client       *http.Client
+	UserAgent    string
+	MaxRedirects int
+	MaxBodyBytes int64
 }
 
 // NewFetcher creates a Fetcher with the given timeout and user-agent.
-func NewFetcher(timeout time.Duration, ua string) *Fetcher {
+func NewFetcher(timeout time.Duration, ua string, maxRedirects int, maxBodyBytes int64) *Fetcher {
+	if maxRedirects <= 0 {
+		maxRedirects = 10
+	}
+	if maxBodyBytes <= 0 {
+		maxBodyBytes = defaultMaxBodyBytes
+	}
 	var chain []models.RedirectHop
 
 	client := &http.Client{
@@ -45,8 +53,8 @@ func NewFetcher(timeout time.Duration, ua string) *Fetcher {
 					StatusCode: 0, // filled after response
 				})
 			}
-			if len(via) >= 10 {
-				return fmt.Errorf("redirect loop: stopped after 10 redirects")
+			if len(via) >= maxRedirects {
+				return fmt.Errorf("redirect loop: stopped after %d redirects", maxRedirects)
 			}
 			return nil
 		},
@@ -55,8 +63,10 @@ func NewFetcher(timeout time.Duration, ua string) *Fetcher {
 	_ = chain // chain is captured per-request below via a fresh closure each time
 
 	return &Fetcher{
-		client:    client,
-		UserAgent: ua,
+		client:       client,
+		UserAgent:    ua,
+		MaxRedirects: maxRedirects,
+		MaxBodyBytes: maxBodyBytes,
 	}
 }
 
@@ -75,8 +85,8 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) *FetchResult {
 					StatusCode: 0,
 				})
 			}
-			if len(via) >= 10 {
-				return fmt.Errorf("redirect loop: stopped after 10 hops")
+			if len(via) >= f.MaxRedirects {
+				return fmt.Errorf("redirect loop: stopped after %d hops", f.MaxRedirects)
 			}
 			return nil
 		},
@@ -99,7 +109,7 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) *FetchResult {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, f.MaxBodyBytes))
 	if err != nil {
 		return &FetchResult{
 			URL:            rawURL,

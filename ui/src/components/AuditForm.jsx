@@ -3,11 +3,26 @@ import { ChevronDown, ChevronUp, Play } from 'lucide-react'
 
 const DEFAULTS = {
   url: '',
+  scope: 'host',
+  scope_prefix: '',
+  sitemap_url: '',
+  sitemap_mode: 'discover',
   max_depth: -1,
   max_pages: 0,
   concurrency: 10,
   timeout: '30s',
   platform: '',
+  user_agent: '',
+  mobile_user_agent: '',
+  respect_robots: true,
+  max_redirects: 10,
+  max_page_size_kb: 5120,
+  max_url_length: 0,
+  max_query_params: 0,
+  max_links_per_page: 0,
+  follow_nofollow_links: false,
+  expand_noindex_pages: true,
+  expand_canonicalized_pages: true,
   output_dir: '',
   validate_external_links: true,
   discover_resources: true,
@@ -30,6 +45,11 @@ export default function AuditForm({ onSubmit, loading }) {
       await onSubmit({
         ...form,
         url,
+        max_redirects: Number(form.max_redirects),
+        max_page_size_kb: Number(form.max_page_size_kb),
+        max_url_length: Number(form.max_url_length),
+        max_query_params: Number(form.max_query_params),
+        max_links_per_page: Number(form.max_links_per_page),
         max_depth:   Number(form.max_depth),
         max_pages:   Number(form.max_pages),
         concurrency: Number(form.concurrency),
@@ -154,6 +174,45 @@ export default function AuditForm({ onSubmit, loading }) {
             </select>
           </div>
 
+          <div>
+            <label className="label">Crawl scope</label>
+            <select
+              value={form.scope}
+              onChange={(e) => set('scope', e.target.value)}
+              className="input"
+              disabled={loading}
+            >
+              <option value="host">Same host</option>
+              <option value="subfolder">Seed subfolder only</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="label">Scope prefix override</label>
+            <input
+              type="text"
+              placeholder="/buy-used-cars"
+              value={form.scope_prefix}
+              onChange={(e) => set('scope_prefix', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">Sitemap mode</label>
+            <select
+              value={form.sitemap_mode}
+              onChange={(e) => set('sitemap_mode', e.target.value)}
+              className="input"
+              disabled={loading}
+            >
+              <option value="discover">Discover only</option>
+              <option value="seed">Seed crawl from sitemap</option>
+              <option value="off">Disable sitemap discovery</option>
+            </select>
+          </div>
+
           {/* Output dir */}
           <div>
             <label className="label">Custom output dir</label>
@@ -167,8 +226,176 @@ export default function AuditForm({ onSubmit, loading }) {
             />
           </div>
 
+          <div className="col-span-2">
+            <label className="label">Sitemap URL override</label>
+            <input
+              type="url"
+              placeholder="https://example.com/sitemap.xml"
+              value={form.sitemap_url}
+              onChange={(e) => set('sitemap_url', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="col-span-2">
+            <label className="label">Desktop user-agent override</label>
+            <input
+              type="text"
+              placeholder="Leave blank for default SEOAuditBot UA"
+              value={form.user_agent}
+              onChange={(e) => set('user_agent', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="col-span-2">
+            <label className="label">Mobile user-agent override</label>
+            <input
+              type="text"
+              placeholder="Leave blank for default mobile Chrome UA"
+              value={form.mobile_user_agent}
+              onChange={(e) => set('mobile_user_agent', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">Max redirects</label>
+            <input
+              type="number"
+              min={1}
+              value={form.max_redirects}
+              onChange={(e) => set('max_redirects', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">Max page size (KB)</label>
+            <input
+              type="number"
+              min={1}
+              value={form.max_page_size_kb}
+              onChange={(e) => set('max_page_size_kb', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">Max URL length</label>
+            <input
+              type="number"
+              min={0}
+              value={form.max_url_length}
+              onChange={(e) => set('max_url_length', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">Max query params</label>
+            <input
+              type="number"
+              min={0}
+              value={form.max_query_params}
+              onChange={(e) => set('max_query_params', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">Max links per page</label>
+            <input
+              type="number"
+              min={0}
+              value={form.max_links_per_page}
+              onChange={(e) => set('max_links_per_page', e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
           {/* Opt-in slow checks */}
           <div className="col-span-2 border-t border-gray-800 pt-4 mt-1 flex flex-col gap-3">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={form.respect_robots}
+                onChange={(e) => set('respect_robots', e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-gray-800 accent-emerald-500"
+                disabled={loading}
+              />
+              <div>
+                <div className="text-sm text-gray-200 group-hover:text-white">
+                  Respect robots.txt
+                </div>
+                <div className="text-xs text-gray-500">
+                  Keep crawl behavior aligned with robots.txt allow and disallow rules.
+                </div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={form.follow_nofollow_links}
+                onChange={(e) => set('follow_nofollow_links', e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-gray-800 accent-emerald-500"
+                disabled={loading}
+              />
+              <div>
+                <div className="text-sm text-gray-200 group-hover:text-white">
+                  Follow internal nofollow links
+                </div>
+                <div className="text-xs text-gray-500">
+                  Allow rel=nofollow links to expand the crawl frontier.
+                </div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={form.expand_noindex_pages}
+                onChange={(e) => set('expand_noindex_pages', e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-gray-800 accent-emerald-500"
+                disabled={loading}
+              />
+              <div>
+                <div className="text-sm text-gray-200 group-hover:text-white">
+                  Expand links on noindex pages
+                </div>
+                <div className="text-xs text-gray-500">
+                  Continue discovering URLs from pages that declare noindex.
+                </div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={form.expand_canonicalized_pages}
+                onChange={(e) => set('expand_canonicalized_pages', e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-gray-800 accent-emerald-500"
+                disabled={loading}
+              />
+              <div>
+                <div className="text-sm text-gray-200 group-hover:text-white">
+                  Expand links on canonicalized pages
+                </div>
+                <div className="text-xs text-gray-500">
+                  Continue discovering URLs from pages that canonically point elsewhere.
+                </div>
+              </div>
+            </label>
+
             <label className="flex items-start gap-3 cursor-pointer group">
               <input
                 type="checkbox"

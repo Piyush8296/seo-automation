@@ -10,7 +10,7 @@ import (
 
 // WorkerResult is the output of processing a single URL.
 type WorkerResult struct {
-	Page          *models.PageData
+	Page           *models.PageData
 	DiscoveredURLs []string
 }
 
@@ -32,7 +32,7 @@ func ProcessURL(
 	}
 
 	// Check robots.txt
-	if !robotsCache.IsAllowed(ctx, pageURL, config.UserAgent) {
+	if config.RespectRobots && !robotsCache.IsAllowed(ctx, pageURL, config.UserAgent) {
 		page.Error = "blocked by robots.txt"
 		return &WorkerResult{Page: page}
 	}
@@ -107,9 +107,20 @@ func ProcessURL(
 
 	// Collect discovered internal URLs
 	var discovered []string
-	for _, link := range page.Links {
-		if link.IsInternal && link.IsFollow {
+	if canExpandFromPage(page, config) {
+		followed := 0
+		for _, link := range page.Links {
+			if !link.IsInternal {
+				continue
+			}
+			if !config.FollowNofollowLinks && !link.IsFollow {
+				continue
+			}
+			if config.MaxLinksPerPage > 0 && followed >= config.MaxLinksPerPage {
+				break
+			}
 			discovered = append(discovered, link.URL)
+			followed++
 		}
 	}
 

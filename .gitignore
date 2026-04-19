@@ -10,6 +10,7 @@ reports/
 
 # OS
 .DS_Store
+__pycache__/
 
 # Internal planning docs (local-only)
 FEATURE_ROADMAP.md

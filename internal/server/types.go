@@ -14,35 +14,50 @@ const (
 
 // StartAuditRequest is the JSON body sent to POST /api/audits.
 type StartAuditRequest struct {
-	URL         string `json:"url"`
-	MaxDepth    int    `json:"max_depth"`
-	MaxPages    int    `json:"max_pages"`
-	Concurrency int    `json:"concurrency"`
-	Timeout     string `json:"timeout"`
-	Platform    string `json:"platform"`
-	OutputDir             string `json:"output_dir"`              // optional — overrides default storage dir
-	ValidateExternalLinks bool   `json:"validate_external_links"` // opt-in external link validation
-	DiscoverResources     bool   `json:"discover_resources"`      // opt-in CSS/JS/font sub-resource discovery
+	URL                      string `json:"url"`
+	Scope                    string `json:"scope,omitempty"`
+	ScopePrefix              string `json:"scope_prefix,omitempty"`
+	SitemapURL               string `json:"sitemap_url,omitempty"`
+	SitemapMode              string `json:"sitemap_mode,omitempty"`
+	MaxDepth                 int    `json:"max_depth"`
+	MaxPages                 int    `json:"max_pages"`
+	Concurrency              int    `json:"concurrency"`
+	Timeout                  string `json:"timeout"`
+	Platform                 string `json:"platform"`
+	UserAgent                string `json:"user_agent,omitempty"`
+	MobileUserAgent          string `json:"mobile_user_agent,omitempty"`
+	RespectRobots            *bool  `json:"respect_robots,omitempty"`
+	MaxRedirects             int    `json:"max_redirects,omitempty"`
+	MaxPageSizeKB            int64  `json:"max_page_size_kb,omitempty"`
+	MaxURLLength             int    `json:"max_url_length,omitempty"`
+	MaxQueryParams           int    `json:"max_query_params,omitempty"`
+	MaxLinksPerPage          int    `json:"max_links_per_page,omitempty"`
+	FollowNofollowLinks      bool   `json:"follow_nofollow_links,omitempty"`
+	ExpandNoindexPages       *bool  `json:"expand_noindex_pages,omitempty"`
+	ExpandCanonicalizedPages *bool  `json:"expand_canonicalized_pages,omitempty"`
+	OutputDir                string `json:"output_dir"`              // optional — overrides default storage dir
+	ValidateExternalLinks    bool   `json:"validate_external_links"` // opt-in external link validation
+	DiscoverResources        bool   `json:"discover_resources"`      // opt-in CSS/JS/font sub-resource discovery
 }
 
 // AuditRecord is the persistent metadata for one audit run, stored as meta.json.
 type AuditRecord struct {
-	ID           string             `json:"id"`
-	URL          string             `json:"url"`
-	Config       StartAuditRequest  `json:"config"`
-	Status       AuditStatus        `json:"status"`
-	CreatedAt    time.Time          `json:"created_at"`
-	CompletedAt  *time.Time         `json:"completed_at,omitempty"`
-	HealthScore  float64            `json:"health_score"`
-	Grade        string             `json:"grade"`
-	DesktopScore float64            `json:"desktop_score"`
-	MobileScore  float64            `json:"mobile_score"`
-	ErrorCount   int                `json:"error_count"`
-	WarnCount    int                `json:"warn_count"`
-	NoticeCount  int                `json:"notice_count"`
-	PageCount    int                `json:"page_count"`
-	ReportsDir   string             `json:"reports_dir"`
-	ErrMsg       string             `json:"error,omitempty"`
+	ID           string            `json:"id"`
+	URL          string            `json:"url"`
+	Config       StartAuditRequest `json:"config"`
+	Status       AuditStatus       `json:"status"`
+	CreatedAt    time.Time         `json:"created_at"`
+	CompletedAt  *time.Time        `json:"completed_at,omitempty"`
+	HealthScore  float64           `json:"health_score"`
+	Grade        string            `json:"grade"`
+	DesktopScore float64           `json:"desktop_score"`
+	MobileScore  float64           `json:"mobile_score"`
+	ErrorCount   int               `json:"error_count"`
+	WarnCount    int               `json:"warn_count"`
+	NoticeCount  int               `json:"notice_count"`
+	PageCount    int               `json:"page_count"`
+	ReportsDir   string            `json:"reports_dir"`
+	ErrMsg       string            `json:"error,omitempty"`
 }
 
 // ProgressEvent is a single SSE message sent to the browser.
@@ -63,8 +78,8 @@ type ProgressEvent struct {
 type DiffResponse struct {
 	AuditA      *AuditRecord `json:"audit_a"`
 	AuditB      *AuditRecord `json:"audit_b"`
-	ScoreDelta  float64      `json:"score_delta"`  // positive = improved
-	ErrorDelta  int          `json:"error_delta"`  // negative = fewer errors (good)
+	ScoreDelta  float64      `json:"score_delta"` // positive = improved
+	ErrorDelta  int          `json:"error_delta"` // negative = fewer errors (good)
 	WarnDelta   int          `json:"warn_delta"`
 	NoticeDelta int          `json:"notice_delta"`
 	PageDelta   int          `json:"page_delta"`

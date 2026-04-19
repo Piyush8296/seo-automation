@@ -185,12 +185,14 @@ export default function AuditDetail() {
 
         {/* Audit metadata */}
         <div className="card px-5 py-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
             {[
               { label: 'Audit ID',    value: audit.id },
               { label: 'Started',     value: new Date(audit.created_at).toLocaleString() },
               { label: 'Concurrency', value: audit.config?.concurrency ?? '—' },
               { label: 'Max depth',   value: audit.config?.max_depth === -1 ? 'unlimited' : audit.config?.max_depth },
+              { label: 'Scope',       value: audit.config?.scope ?? 'host' },
+              { label: 'Sitemap',     value: audit.config?.sitemap_mode ?? 'discover' },
             ].map(({ label, value }) => (
               <div key={label}>
                 <div className="text-xs text-gray-500 uppercase tracking-wider">{label}</div>
