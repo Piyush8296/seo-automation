@@ -159,6 +159,7 @@ type Catalog struct {
 	Total      int `json:"total"`
 	PageChecks int `json:"page_checks"`
 	SiteChecks int `json:"site_checks"`
+	CheckIDs   int `json:"check_ids"`
 }
 
 // GetCatalog returns the count of registered check runners.
@@ -167,6 +168,7 @@ func GetCatalog() Catalog {
 		Total:      len(pageChecks) + len(siteChecks),
 		PageChecks: len(pageChecks),
 		SiteChecks: len(siteChecks),
+		CheckIDs:   len(checkDescriptors),
 	}
 }
 

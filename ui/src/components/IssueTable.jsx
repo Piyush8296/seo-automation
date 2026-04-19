@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -18,6 +18,13 @@ const SEVERITY_META = {
   error:   { icon: AlertCircle,   color: '#ffb4ab', bg: 'rgba(147,0,10,0.2)',  label: 'Error'   },
   warning: { icon: AlertTriangle, color: '#ffb7ae', bg: 'rgba(118,37,31,0.2)', label: 'Warning' },
   notice:  { icon: Info,          color: '#8ed793', bg: 'rgba(2,83,30,0.2)',   label: 'Notice'  },
+}
+
+const PLATFORM_META = {
+  desktop: { label: '🖥 Desktop', color: '#3fe56c',  bg: 'rgba(63,229,108,0.12)'  },
+  mobile:  { label: '📱 Mobile',  color: '#8ed793',  bg: 'rgba(142,215,147,0.12)' },
+  diff:    { label: '🔄 M↔D',     color: '#ffb7ae',  bg: 'rgba(255,183,174,0.12)' },
+  both:    { label: '⊕ Both',     color: '#bbcbb8',  bg: 'rgba(187,203,184,0.08)' },
 }
 
 function flattenIssues(report) {
@@ -52,18 +59,98 @@ function SeverityBadge({ severity }) {
   )
 }
 
-function FilterSelect({ value, onChange, options, placeholder }) {
+function SearchableSelect({ value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useRef(null)
+
+  const selected = options.find((o) => o.value === value)
+  const filtered = query
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options
+
+  useEffect(() => {
+    if (!open) setQuery('')
+  }, [open])
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="input text-sm min-w-[140px]"
+    <div ref={ref} className="relative min-w-[150px]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="input text-sm w-full text-left flex items-center justify-between gap-2"
+        style={{ cursor: 'pointer' }}
+      >
+        <span className={selected ? 'text-on-surface' : 'text-on-surface-variant'}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown size={12} className="shrink-0 text-on-surface-variant" />
+      </button>
+      {open && (
+        <div
+          className="absolute z-50 mt-1 w-full rounded-lg overflow-hidden shadow-lg"
+          style={{ background: '#1a202a', border: '1px solid rgba(60,74,60,0.5)', minWidth: '180px' }}
+        >
+          <div className="p-1.5" style={{ borderBottom: '1px solid rgba(60,74,60,0.3)' }}>
+            <div className="relative">
+              <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+              <input
+                autoFocus
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search…"
+                className="w-full bg-surface-container-highest rounded px-2 py-1 pl-6 text-xs text-on-surface outline-none"
+                style={{ border: '1px solid rgba(60,74,60,0.3)' }}
+              />
+            </div>
+          </div>
+          <div className="max-h-48 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={() => { onChange(''); setOpen(false) }}
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-bright transition-colors text-on-surface-variant"
+            >
+              {placeholder}
+            </button>
+            {filtered.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false) }}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-bright transition-colors"
+                style={{ color: opt.value === value ? '#3fe56c' : '#dde2f1' }}
+              >
+                {opt.label}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-3 py-2 text-xs text-on-surface-variant italic">No matches</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PlatformBadge({ platform }) {
+  const key = (!platform || platform === 'both') ? 'both' : platform
+  const meta = PLATFORM_META[key]
+  if (!meta) return null
+  return (
+    <span
+      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap"
+      style={{ color: meta.color, background: meta.bg }}
     >
-      <option value="">{placeholder}</option>
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
+      {meta.label}
+    </span>
   )
 }
 
@@ -75,6 +162,7 @@ export default function IssueTable({ auditId }) {
   const [severity, setSeverity] = useState('')
   const [category, setCategory] = useState('')
   const [checkID, setCheckID] = useState('')
+  const [platform, setPlatform] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState(() => new Set())
@@ -101,17 +189,30 @@ export default function IssueTable({ auditId }) {
     return [...s].sort()
   }, [allIssues])
 
+  const hasPlatformData = useMemo(
+    () => allIssues.some((i) => i.platform && i.platform !== 'both' && i.platform !== ''),
+    [allIssues]
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return allIssues
       .filter((i) => !severity || i.severity === severity)
       .filter((i) => !category || i.category === category)
       .filter((i) => !checkID || i.id === checkID)
+      .filter((i) => {
+        if (!platform) return true
+        const p = i.platform || 'both'
+        if (platform === 'desktop') return p === 'desktop' || p === 'both' || p === ''
+        if (platform === 'mobile')  return p === 'mobile'  || p === 'both' || p === ''
+        if (platform === 'both')    return !p || p === 'both'
+        return p === platform
+      })
       .filter((i) => !q || (i.pageURL || '').toLowerCase().includes(q) || (i.message || '').toLowerCase().includes(q))
       .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
-  }, [allIssues, severity, category, checkID, search])
+  }, [allIssues, severity, category, checkID, platform, search])
 
-  useEffect(() => { setPage(1); setExpanded(new Set()) }, [severity, category, checkID, search])
+  useEffect(() => { setPage(1); setExpanded(new Set()) }, [severity, category, checkID, platform, search])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -126,8 +227,8 @@ export default function IssueTable({ auditId }) {
     })
   }
 
-  const clearFilters = () => { setSeverity(''); setCategory(''); setCheckID(''); setSearch('') }
-  const hasFilters = severity || category || checkID || search
+  const clearFilters = () => { setSeverity(''); setCategory(''); setCheckID(''); setPlatform(''); setSearch('') }
+  const hasFilters = severity || category || checkID || platform || search
 
   if (loading) {
     return (
@@ -151,42 +252,53 @@ export default function IssueTable({ auditId }) {
 
   return (
     <div className="card flex flex-col">
-      {/* Filters */}
+      {/* Filters — single row */}
       <div
-        className="p-4 flex flex-wrap items-center gap-2"
+        className="px-4 py-3 flex items-center gap-2 flex-wrap"
         style={{ borderBottom: '1px solid rgba(60,74,60,0.35)' }}
       >
-        <div className="relative flex-1 min-w-[220px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search URL or message…"
-            className="input text-sm pl-9"
+            className="input text-sm pl-8"
           />
         </div>
-        <FilterSelect
+        <SearchableSelect
           value={severity}
           onChange={setSeverity}
           placeholder="All severities"
           options={[
-            { value: 'error',   label: 'Errors' },
-            { value: 'warning', label: 'Warnings' },
-            { value: 'notice',  label: 'Notices' },
+            { value: 'error',   label: '● Error'   },
+            { value: 'warning', label: '● Warning' },
+            { value: 'notice',  label: '● Notice'  },
           ]}
         />
-        <FilterSelect
+        <SearchableSelect
           value={category}
           onChange={setCategory}
           placeholder="All categories"
           options={categories.map((c) => ({ value: c, label: c }))}
         />
-        <FilterSelect
+        <SearchableSelect
           value={checkID}
           onChange={setCheckID}
           placeholder="All checks"
           options={checkIDs.map((c) => ({ value: c, label: c }))}
+        />
+        <SearchableSelect
+          value={platform}
+          onChange={setPlatform}
+          placeholder="All platforms"
+          options={[
+            { value: 'desktop', label: '🖥 Desktop' },
+            { value: 'mobile',  label: '📱 Mobile'  },
+            { value: 'diff',    label: '🔄 M↔D Diff' },
+            { value: 'both',    label: '⊕ Both'      },
+          ]}
         />
         {hasFilters && (
           <button onClick={clearFilters} className="btn-ghost" title="Clear filters">
@@ -224,6 +336,7 @@ export default function IssueTable({ auditId }) {
                 <th className="text-left font-medium px-3 py-2.5">Severity</th>
                 <th className="text-left font-medium px-3 py-2.5">Check</th>
                 <th className="text-left font-medium px-3 py-2.5">Category</th>
+                <th className="text-left font-medium px-3 py-2.5">Platform</th>
                 <th className="text-left font-medium px-3 py-2.5">URL</th>
                 <th className="text-left font-medium px-3 py-2.5">Message</th>
               </tr>
@@ -250,6 +363,9 @@ export default function IssueTable({ auditId }) {
                         <code className="text-xs font-mono" style={{ color: '#3fe56c' }}>{issue.id}</code>
                       </td>
                       <td className="px-3 py-2.5 align-top text-xs text-on-surface-variant">{issue.category}</td>
+                      <td className="px-3 py-2.5 align-top whitespace-nowrap">
+                        <PlatformBadge platform={issue.platform} />
+                      </td>
                       <td className="px-3 py-2.5 align-top max-w-[260px]">
                         {issue.scope === 'site' ? (
                           <span className="text-xs text-on-surface-variant italic">site-wide</span>
@@ -272,7 +388,7 @@ export default function IssueTable({ auditId }) {
                     {isOpen && hasDetails && (
                       <tr style={{ background: '#1a202a', borderTop: '1px solid rgba(60,74,60,0.25)' }}>
                         <td />
-                        <td colSpan={5} className="px-3 py-3">
+                        <td colSpan={6} className="px-3 py-3">
                           <pre className="text-xs text-on-surface/70 whitespace-pre-wrap font-mono leading-relaxed">{issue.details}</pre>
                         </td>
                       </tr>

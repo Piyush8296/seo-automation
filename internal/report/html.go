@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cars24/seo-automation/internal/checks"
 	"github.com/cars24/seo-automation/internal/models"
 )
 
@@ -33,15 +34,23 @@ type CategoryStat struct {
 	Icon     string
 }
 
+// CheckCategoryGroup groups check descriptors by category for template rendering.
+type CheckCategoryGroup struct {
+	Category string
+	Icon     string
+	Checks   []models.CheckDescriptor
+}
+
 type templateData struct {
 	*models.SiteAudit
-	AllIssues     []Issue
-	TopIssues     []Issue
-	CategoryStats []CategoryStat
-	ErrorIssues   []Issue
-	WarnIssues    []Issue
-	NoticeIssues  []Issue
-	HasMobileData bool
+	AllIssues      []Issue
+	TopIssues      []Issue
+	CategoryStats  []CategoryStat
+	ErrorIssues    []Issue
+	WarnIssues     []Issue
+	NoticeIssues   []Issue
+	HasMobileData  bool
+	CheckGroups    []CheckCategoryGroup
 }
 
 var catIcons = map[string]string{
@@ -136,6 +145,18 @@ func WriteHTML(audit *models.SiteAudit, outputDir string) (string, error) {
 		return cats[i].Warnings > cats[j].Warnings
 	})
 
+	var checkGroups []CheckCategoryGroup
+	for _, d := range checks.GetCheckDescriptors() {
+		if len(checkGroups) == 0 || checkGroups[len(checkGroups)-1].Category != d.Category {
+			ic := catIcons[d.Category]
+			if ic == "" {
+				ic = "📌"
+			}
+			checkGroups = append(checkGroups, CheckCategoryGroup{Category: d.Category, Icon: ic})
+		}
+		checkGroups[len(checkGroups)-1].Checks = append(checkGroups[len(checkGroups)-1].Checks, d)
+	}
+
 	data := templateData{
 		SiteAudit:     audit,
 		AllIssues:     allIssues,
@@ -145,6 +166,7 @@ func WriteHTML(audit *models.SiteAudit, outputDir string) (string, error) {
 		WarnIssues:    warnI,
 		NoticeIssues:  noticeI,
 		HasMobileData: hasMobileData,
+		CheckGroups:   checkGroups,
 	}
 
 	funcMap := template.FuncMap{
@@ -171,24 +193,24 @@ func WriteHTML(audit *models.SiteAudit, outputDir string) (string, error) {
 		"gradeCol": func(g string) string {
 			switch g {
 			case "A":
-				return "#10b981"
+				return "#3fe56c"
 			case "B":
-				return "#3b82f6"
+				return "#8ed793"
 			case "C":
-				return "#f59e0b"
+				return "#ffb7ae"
 			case "D":
-				return "#f97316"
+				return "#ffb4ab"
 			default:
-				return "#ef4444"
+				return "#ffb4ab"
 			}
 		},
 		"scoreCol": func(score float64) string {
 			if score >= 80 {
-				return "#10b981"
+				return "#3fe56c"
 			} else if score >= 60 {
-				return "#f59e0b"
+				return "#ffb7ae"
 			}
-			return "#ef4444"
+			return "#ffb4ab"
 		},
 		"statusBadge": func(code int) string {
 			if code >= 200 && code < 300 {
@@ -215,6 +237,13 @@ func WriteHTML(audit *models.SiteAudit, outputDir string) (string, error) {
 			return math.Round(float64(n) * 100.0 / float64(total))
 		},
 		"add": func(a, b int) int { return a + b },
+		"checkGroupCount": func(groups []CheckCategoryGroup) int {
+			n := 0
+			for _, g := range groups {
+				n += len(g.Checks)
+			}
+			return n
+		},
 		"platClass": func(p models.Platform) string {
 			switch p {
 			case models.PlatformMobile:
@@ -277,190 +306,206 @@ const htmlTmpl = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SEO Audit — {{.SiteURL}}</title>
+<title>SEO Observatory — {{.SiteURL}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-/* ── Reset & tokens ───────────────────────────────────────── */
-*, *::before, *::after{box-sizing:border-box;margin:0;padding:0}
+/* ── Reset & design tokens ────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0d0f18;--s1:#141620;--s2:#1c1f2e;--s3:#242840;
-  --border:#2a2d42;--border2:#343756;
-  --text:#e2e8f5;--muted:#7c839e;--faint:#4a5068;
-  --accent:#6366f1;--accent2:#818cf8;
-  --red:#ef4444;--redBg:rgba(239,68,68,.12);
-  --orange:#f97316;--orangeBg:rgba(249,115,22,.12);
-  --yellow:#f59e0b;--yellowBg:rgba(245,158,11,.12);
-  --blue:#3b82f6;--blueBg:rgba(59,130,246,.12);
-  --green:#10b981;--greenBg:rgba(16,185,129,.12);
-  --purple:#a855f7;--purpleBg:rgba(168,85,247,.12);
-  --r:8px;--r2:12px;--r3:16px;
-  --shadow:0 2px 8px rgba(0,0,0,.4);
-  --shadow2:0 4px 20px rgba(0,0,0,.5);
+  --bg:#0e131e;
+  --s1:#161c26;
+  --s2:#1a202a;
+  --s3:#242a35;
+  --s4:#2f3540;
+  --bright:#343945;
+  --text:#dde2f1;
+  --muted:#bbcbb8;
+  --faint:#869583;
+  --ov:#3c4a3c;
+  --primary:#3fe56c;
+  --primary-dim:#00c853;
+  --on-primary:#003912;
+  --secondary:#8ed793;
+  --error:#ffb4ab;   --error-bg:rgba(147,0,10,.25);
+  --warn:#ffb7ae;    --warn-bg:rgba(118,37,31,.22);
+  --notice:#8ed793;  --notice-bg:rgba(2,83,30,.22);
+  --r:6px;--r2:10px;--r3:14px;
 }
 html{scroll-behavior:smooth}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;font-size:14px}
-a{color:var(--accent2);text-decoration:none}a:hover{text-decoration:underline}
-h1{font-size:26px;font-weight:800;letter-spacing:-.5px}
-h2{font-size:19px;font-weight:700;letter-spacing:-.3px}
-h3{font-size:15px;font-weight:600}
-code{font-family:'JetBrains Mono',Menlo,monospace;font-size:11px;background:var(--s3);padding:2px 6px;border-radius:4px;color:var(--accent2)}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:14px;-webkit-font-smoothing:antialiased}
+a{color:var(--primary);text-decoration:none}a:hover{opacity:.8}
+h1{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;letter-spacing:-.5px}
+h2{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px}
+h3{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600}
+code{font-family:'JetBrains Mono',Menlo,monospace;font-size:10px;background:var(--s4);padding:2px 6px;border-radius:4px;color:var(--primary)}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--s4);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--bright)}
 
 /* ── Layout ───────────────────────────────────────────────── */
 .shell{display:flex;min-height:100vh}
-aside{width:240px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
-aside::-webkit-scrollbar{width:4px}aside::-webkit-scrollbar-track{background:transparent}aside::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-.brand{padding:20px 20px 12px;border-bottom:1px solid var(--border)}
-.brand-logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;color:var(--text)}
-.brand-logo span{background:linear-gradient(135deg,var(--accent),#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.nav-section{padding:12px 0}
-.nav-label{padding:6px 20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--faint)}
-.nav-link{display:flex;align-items:center;gap:8px;padding:7px 20px;color:var(--muted);font-size:13px;transition:all .15s;cursor:pointer;border-left:3px solid transparent}
-.nav-link:hover,.nav-link.active{background:var(--s2);color:var(--text);border-left-color:var(--accent)}
-.nav-link .icon{font-size:14px;width:18px;text-align:center}
-.nav-count{margin-left:auto;font-size:10px;background:var(--s3);border-radius:10px;padding:2px 7px;color:var(--muted)}
-.nav-count.err{background:var(--redBg);color:var(--red)}
-main{flex:1;min-width:0;padding:32px 36px}
+aside{width:236px;flex-shrink:0;background:var(--s1);position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.brand{padding:20px 16px 14px}
+.brand-logo{display:flex;align-items:center;gap:8px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px}
+.brand-dot{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#3fe56c,#00c853);display:flex;align-items:center;justify-content:center;font-size:13px;color:#003912;font-weight:700;flex-shrink:0}
+.brand-url{font-size:10px;color:var(--muted);word-break:break-all;padding-left:36px;line-height:1.4}
+.nav-sep{height:1px;background:rgba(60,74,60,.35);margin:6px 0}
+.nav-label{padding:8px 16px 4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--faint)}
+.nav-link{display:flex;align-items:center;gap:8px;padding:7px 16px;color:var(--muted);font-size:12px;transition:all .15s;cursor:pointer;border-right:2px solid transparent;text-decoration:none}
+.nav-link:hover{background:var(--bright);color:var(--text)}
+.nav-link.active{background:var(--s2);color:var(--primary);border-right-color:var(--primary-dim)}
+.nav-link .icon{font-size:13px;width:16px;text-align:center;flex-shrink:0}
+.nav-count{margin-left:auto;font-size:9px;background:var(--s3);border-radius:8px;padding:1px 6px;color:var(--muted);font-weight:600}
+.nav-count.err{background:var(--error-bg);color:var(--error)}
+.nav-footer{margin-top:auto;padding:14px 16px;font-size:10px;color:var(--faint);border-top:1px solid rgba(60,74,60,.3);line-height:1.6}
+main{flex:1;min-width:0;padding:28px 32px}
 
-/* ── Cover / Header ───────────────────────────────────────── */
-.cover{background:linear-gradient(135deg,var(--s2) 0%,var(--s1) 100%);border:1px solid var(--border);border-radius:var(--r3);padding:36px 40px;margin-bottom:28px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
+/* ── Cover ────────────────────────────────────────────────── */
+.cover{background:var(--s1);border-radius:var(--r3);padding:32px 36px;margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;position:relative;overflow:hidden}
+.cover::before{content:'';position:absolute;inset:0;opacity:.03;background-image:radial-gradient(#00C853 .5px,transparent .5px);background-size:18px 18px;pointer-events:none}
 .cover-left h1{margin-bottom:6px}
-.cover-meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
-.cover-chip{display:flex;align-items:center;gap:6px;background:var(--s3);border:1px solid var(--border2);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--muted)}
+.cover-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.cover-chip{display:flex;align-items:center;gap:5px;background:var(--s3);border-radius:20px;padding:4px 11px;font-size:11px;color:var(--muted)}
 .cover-chip strong{color:var(--text)}
-.cover-right{display:flex;flex-direction:column;align-items:center;gap:16px;flex-shrink:0}
+.cover-right{display:flex;flex-direction:column;align-items:center;gap:14px;flex-shrink:0}
 .score-ring{position:relative;display:flex;align-items:center;justify-content:center}
 .score-ring svg{transform:rotate(-90deg)}
 .score-inner{position:absolute;text-align:center;pointer-events:none}
-.score-num{font-size:36px;font-weight:900;line-height:1}
-.score-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:2px}
-.grade-pill{padding:6px 20px;border-radius:24px;font-size:22px;font-weight:900;letter-spacing:-.5px}
+.score-num{font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;line-height:1}
+.score-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:2px}
+.grade-pill{padding:5px 18px;border-radius:20px;font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700}
+.score-grid{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.score-block{display:flex;flex-direction:column;align-items:center;gap:6px}
+.score-block-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
 
 /* ── Metric cards ─────────────────────────────────────────── */
-.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:28px}
-.metric-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:18px 20px;position:relative;overflow:hidden}
-.metric-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:2px}
-.metric-card.err::before{background:var(--red)}
-.metric-card.warn::before{background:var(--yellow)}
-.metric-card.notice::before{background:var(--blue)}
-.metric-card.ok::before{background:var(--green)}
-.mc-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
-.mc-value{font-size:30px;font-weight:800;line-height:1}
-.mc-value.err{color:var(--red)}
-.mc-value.warn{color:var(--yellow)}
-.mc-value.notice{color:var(--blue)}
-.mc-value.ok{color:var(--green)}
-.mc-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:24px}
+.metric-card{background:var(--s1);border-radius:var(--r2);padding:16px 18px;position:relative;overflow:hidden}
+.metric-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;border-radius:0 1px 1px 0}
+.metric-card.err::before{background:var(--error)}
+.metric-card.warn::before{background:var(--warn)}
+.metric-card.notice::before{background:var(--notice)}
+.metric-card.ok::before{background:var(--primary)}
+.mc-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+.mc-value{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;line-height:1}
+.mc-value.err{color:var(--error)}
+.mc-value.warn{color:var(--warn)}
+.mc-value.notice{color:var(--notice)}
+.mc-value.ok{color:var(--primary)}
+.mc-sub{font-size:10px;color:var(--muted);margin-top:4px}
 
-/* ── Section layout ───────────────────────────────────────── */
-.section{margin-bottom:36px}
-.section-header{display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+/* ── Sections ─────────────────────────────────────────────── */
+.section{margin-bottom:32px}
+.section-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid rgba(60,74,60,.35)}
 .section-header h2{flex:1}
-.section-badge{background:var(--s3);border:1px solid var(--border2);border-radius:20px;padding:3px 12px;font-size:12px;color:var(--muted)}
+.section-badge{background:var(--s3);border-radius:20px;padding:2px 10px;font-size:11px;color:var(--muted)}
 
 /* ── Category grid ────────────────────────────────────────── */
-.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-.cat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:16px 18px;cursor:pointer;transition:all .2s;text-decoration:none;color:inherit;display:block}
-.cat-card:hover{border-color:var(--border2);background:var(--s2);transform:translateY(-1px);box-shadow:var(--shadow)}
-.cat-top{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.cat-icon{font-size:18px;line-height:1}
-.cat-name{font-size:13px;font-weight:600;flex:1}
-.cat-score{font-size:13px;font-weight:700}
-.cat-bar{height:4px;background:var(--s3);border-radius:2px;overflow:hidden;margin-bottom:10px}
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.cat-card{background:var(--s1);border-radius:var(--r2);padding:14px 16px;cursor:pointer;transition:background .15s,transform .15s;text-decoration:none;color:inherit;display:block}
+.cat-card:hover{background:var(--s2);transform:translateY(-1px)}
+.cat-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cat-icon{font-size:16px;line-height:1}
+.cat-name{font-size:12px;font-weight:600;flex:1}
+.cat-score{font-size:12px;font-weight:700}
+.cat-bar{height:3px;background:var(--s4);border-radius:2px;overflow:hidden;margin-bottom:8px}
 .cat-bar-fill{height:100%;border-radius:2px;transition:width .4s}
-.cat-counts{display:flex;gap:8px}
-.cc{font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px}
-.cc.e{background:var(--redBg);color:var(--red)}
-.cc.w{background:var(--yellowBg);color:var(--yellow)}
-.cc.n{background:var(--blueBg);color:var(--blue)}
+.cat-counts{display:flex;gap:6px}
+.cc{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px}
+.cc.e{background:var(--error-bg);color:var(--error)}
+.cc.w{background:var(--warn-bg);color:var(--warn)}
+.cc.n{background:var(--notice-bg);color:var(--notice)}
 
-/* ── Priority issues ──────────────────────────────────────── */
-.priority-list{display:flex;flex-direction:column;gap:10px}
-.priority-item{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:16px 20px;display:flex;gap:14px;align-items:flex-start}
-.priority-num{font-size:20px;font-weight:900;color:var(--faint);line-height:1;flex-shrink:0;width:28px;text-align:right}
+/* ── Priority items ───────────────────────────────────────── */
+.priority-list{display:flex;flex-direction:column;gap:8px}
+.priority-item{background:var(--s1);border-radius:var(--r2);padding:14px 18px;display:flex;gap:12px;align-items:flex-start;position:relative;overflow:hidden}
+.priority-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--error);border-radius:0 2px 2px 0}
+.priority-item.warn-item::before{background:var(--warn)}
+.priority-num{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--faint);line-height:1;flex-shrink:0;width:24px;text-align:right}
 .priority-body{flex:1;min-width:0}
-.priority-title{font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.priority-url{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px}
-.priority-detail{font-size:12px;color:var(--muted);font-style:italic}
+.priority-title{font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.priority-url{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px}
+.priority-detail{font-size:11px;color:var(--faint);font-style:italic}
 
-/* ── Severity badges ──────────────────────────────────────── */
-.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
-.badge.e{background:var(--redBg);color:var(--red);border:1px solid rgba(239,68,68,.25)}
-.badge.w{background:var(--yellowBg);color:var(--yellow);border:1px solid rgba(245,158,11,.25)}
-.badge.n{background:var(--blueBg);color:var(--blue);border:1px solid rgba(59,130,246,.25)}
-.badge::before{content:'●';font-size:7px}
+/* ── Badges ───────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.badge.e{background:var(--error-bg);color:var(--error)}
+.badge.w{background:var(--warn-bg);color:var(--warn)}
+.badge.n{background:var(--notice-bg);color:var(--notice)}
+.badge::before{content:'●';font-size:6px}
 
 /* ── Collapsible category sections ───────────────────────── */
-.cat-section{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);margin-bottom:10px;overflow:hidden}
-.cat-section-hdr{display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;user-select:none;transition:background .15s}
-.cat-section-hdr:hover{background:var(--s2)}
-.cat-section-hdr .arrow{margin-left:auto;color:var(--muted);transition:transform .2s;font-size:12px}
+.cat-section{background:var(--s1);border-radius:var(--r2);margin-bottom:8px;overflow:hidden}
+.cat-section-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none;transition:background .15s}
+.cat-section-hdr:hover{background:var(--bright)}
+.cat-section-hdr .arrow{margin-left:auto;color:var(--faint);transition:transform .2s;font-size:11px}
 .cat-section-hdr.open .arrow{transform:rotate(90deg)}
-.cat-section-body{display:none;border-top:1px solid var(--border)}
+.cat-section-body{display:none;border-top:1px solid rgba(60,74,60,.3)}
 .cat-section-body.open{display:block}
 
-/* ── Issue table ──────────────────────────────────────────── */
+/* ── Tables ───────────────────────────────────────────────── */
 .tbl-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:13px}
-thead th{padding:9px 12px;background:var(--s2);border-bottom:1px solid var(--border2);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);text-align:left;white-space:nowrap}
-tbody td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:8px 12px;background:var(--s3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;white-space:nowrap;border-bottom:1px solid rgba(60,74,60,.3)}
+tbody td{padding:8px 12px;border-bottom:1px solid rgba(60,74,60,.2);vertical-align:middle}
 tbody tr:last-child td{border-bottom:none}
-tbody tr:hover td{background:var(--s2)}
-.td-id code{font-size:10px}
+tbody tr:hover td{background:var(--bright)}
+.td-id code{font-size:9px}
 .td-url{max-width:260px}
-.td-url a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent2);font-size:12px}
+.td-url a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--primary);font-size:11px}
 .td-msg{max-width:280px}
-.td-detail{max-width:180px;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.td-detail{max-width:180px;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── Toolbar ──────────────────────────────────────────────── */
-.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.search-box{flex:1;min-width:200px;max-width:320px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--r);padding:7px 12px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
-.search-box:focus{border-color:var(--accent)}
+.toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.search-box{flex:1;min-width:200px;max-width:300px;background:var(--s4);border:1px solid transparent;border-radius:var(--r);padding:7px 12px;color:var(--text);font-size:12px;outline:none;transition:border-color .15s;font-family:'Inter',sans-serif}
+.search-box:focus{border-color:rgba(63,229,108,.4)}
 .search-box::placeholder{color:var(--faint)}
-.filt-btn{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:6px 12px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
-.filt-btn:hover,.filt-btn.on{border-color:var(--accent);color:var(--text);background:rgba(99,102,241,.12)}
-.pg-bar{display:flex;gap:8px;margin-top:12px;align-items:center;font-size:12px;color:var(--muted)}
-.pg-bar button{background:var(--s2);border:1px solid var(--border);border-radius:5px;padding:4px 10px;color:var(--text);cursor:pointer;font-size:12px}
-.pg-bar button:disabled{opacity:.35;cursor:default}
+.filt-btn{background:var(--s2);border-radius:var(--r);padding:6px 12px;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;border:none}
+.filt-btn:hover,.filt-btn.on{color:var(--primary);background:rgba(63,229,108,.1)}
+.pg-bar{display:flex;gap:8px;margin-top:10px;align-items:center;font-size:11px;color:var(--muted)}
+.pg-bar button{background:var(--s2);border:none;border-radius:var(--r);padding:4px 10px;color:var(--text);cursor:pointer;font-size:11px;font-family:'Inter',sans-serif}
+.pg-bar button:disabled{opacity:.3;cursor:default}
 
-/* ── Pages table ──────────────────────────────────────────── */
-.status-ok{color:var(--green);font-weight:700}
-.status-redir{color:var(--yellow);font-weight:700}
-.status-err{color:var(--red);font-weight:700}
+/* ── Status codes ─────────────────────────────────────────── */
+.status-ok{color:var(--primary);font-weight:700}
+.status-redir{color:var(--warn);font-weight:700}
+.status-err{color:var(--error);font-weight:700}
 .depth-pip{display:inline-flex;gap:2px}
-.dp{width:6px;height:6px;border-radius:50%;background:var(--s3)}
-.dp.fill{background:var(--accent)}
+.dp{width:5px;height:5px;border-radius:50%;background:var(--s4)}
+.dp.fill{background:var(--primary)}
 
 /* ── Charts ───────────────────────────────────────────────── */
-.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
-.chart-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:20px 24px}
-.chart-title{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:.06em}
-.donut-wrap{display:flex;align-items:center;gap:24px}
-.donut-legend{display:flex;flex-direction:column;gap:10px}
-.dl-item{display:flex;align-items:center;gap:8px;font-size:13px}
-.dl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.dl-val{margin-left:auto;font-weight:700;min-width:36px;text-align:right}
-.bar-chart{display:flex;flex-direction:column;gap:8px}
-.bc-row{display:flex;align-items:center;gap:10px;font-size:12px}
-.bc-label{width:130px;text-align:right;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
-.bc-track{flex:1;height:16px;background:var(--s3);border-radius:4px;overflow:hidden}
-.bc-fill{height:100%;border-radius:4px;min-width:4px;transition:width .5s}
-.bc-num{width:36px;text-align:right;font-weight:600;color:var(--text)}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+.chart-card{background:var(--s1);border-radius:var(--r2);padding:18px 22px}
+.chart-title{font-size:10px;font-weight:600;color:var(--muted);margin-bottom:14px;text-transform:uppercase;letter-spacing:.08em}
+.donut-wrap{display:flex;align-items:center;gap:20px}
+.donut-legend{display:flex;flex-direction:column;gap:8px}
+.dl-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.dl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dl-val{margin-left:auto;font-weight:700;min-width:32px;text-align:right}
+.bar-chart{display:flex;flex-direction:column;gap:7px}
+.bc-row{display:flex;align-items:center;gap:10px;font-size:11px}
+.bc-label{width:120px;text-align:right;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.bc-track{flex:1;height:14px;background:var(--s3);border-radius:3px;overflow:hidden}
+.bc-fill{height:100%;border-radius:3px;min-width:3px;transition:width .5s}
+.bc-num{width:32px;text-align:right;font-weight:600;color:var(--text)}
 
 /* ── Platform badges ──────────────────────────────────────── */
-.plat{display:inline-flex;align-items:center;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
-.plat-m{background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.25)}
-.plat-d{background:rgba(59,130,246,.12);color:#3b82f6;border:1px solid rgba(59,130,246,.25)}
-.plat-diff{background:rgba(168,85,247,.12);color:#a855f7;border:1px solid rgba(168,85,247,.25)}
+.plat{display:inline-flex;align-items:center;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
+.plat-m{background:rgba(142,215,147,.12);color:#8ed793}
+.plat-d{background:rgba(63,229,108,.12);color:#3fe56c}
+.plat-diff{background:rgba(255,183,174,.12);color:#ffb7ae}
 .plat-both{display:none}
 
-/* ── Score grid ───────────────────────────────────────────── */
-.score-grid{display:flex;gap:24px;align-items:center;flex-wrap:wrap}
-.score-block{display:flex;flex-direction:column;align-items:center;gap:8px}
-.score-block-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700}
-
 /* ── Misc ─────────────────────────────────────────────────── */
-.empty{text-align:center;padding:40px;color:var(--faint);font-size:13px}
+.empty{text-align:center;padding:36px;color:var(--faint);font-size:13px}
 .hidden{display:none!important}
-.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.pill{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600}
 
 /* ── Print ────────────────────────────────────────────────── */
 @media print{
@@ -469,7 +514,7 @@ tbody tr:hover td{background:var(--s2)}
   .toolbar,.pg-bar{display:none}
   .cat-section-body{display:block!important}
   body{background:#fff;color:#111}
-  .cover,.metric-card,.cat-card,.cat-section,.chart-card,.priority-item{background:#fff;border-color:#ddd}
+  .cover,.metric-card,.cat-card,.cat-section,.chart-card,.priority-item{background:#fff}
 }
 </style>
 </head>
@@ -479,25 +524,28 @@ tbody tr:hover td{background:var(--s2)}
 <!-- ── Sidebar ──────────────────────────────────────────── -->
 <aside>
   <div class="brand">
-    <div class="brand-logo"><span>SEO</span>Audit</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all">{{.SiteURL}}</div>
+    <div class="brand-logo">
+      <div class="brand-dot">◉</div>
+      SEO Observatory
+    </div>
+    <div class="brand-url">{{.SiteURL}}</div>
   </div>
-  <nav class="nav-section">
+  <nav>
     <div class="nav-label">Report</div>
-    <a class="nav-link" href="#overview"><span class="icon">🏠</span>Overview</a>
-    <a class="nav-link" href="#categories"><span class="icon">📊</span>Categories</a>
-    <a class="nav-link" href="#priority"><span class="icon">🔥</span>Priority Issues<span class="nav-count err">{{len .TopIssues}}</span></a>
-    <a class="nav-link" href="#all-issues"><span class="icon">📋</span>All Issues<span class="nav-count">{{len .AllIssues}}</span></a>
-    <a class="nav-link" href="#pages"><span class="icon">📄</span>Pages<span class="nav-count">{{.PagesCrawled}}</span></a>
-  </nav>
-  <nav class="nav-section" style="border-top:1px solid var(--border)">
+    <a class="nav-link" href="#overview"><span class="icon">◈</span>Overview</a>
+    <a class="nav-link" href="#categories"><span class="icon">◫</span>Categories</a>
+    <a class="nav-link" href="#priority"><span class="icon">◎</span>Priority Issues<span class="nav-count err">{{len .TopIssues}}</span></a>
+    <a class="nav-link" href="#all-issues"><span class="icon">≡</span>All Issues<span class="nav-count">{{len .AllIssues}}</span></a>
+    <a class="nav-link" href="#pages"><span class="icon">◱</span>Pages<span class="nav-count">{{.PagesCrawled}}</span></a>
+    <a class="nav-link" href="#checks"><span class="icon">✦</span>Checks Catalog<span class="nav-count">{{checkGroupCount .CheckGroups}}</span></a>
+    <div class="nav-sep"></div>
     <div class="nav-label">By Severity</div>
-    <a class="nav-link" href="#sec-errors"><span class="icon">🔴</span>Errors<span class="nav-count err">{{len .ErrorIssues}}</span></a>
-    <a class="nav-link" href="#sec-warnings"><span class="icon">🟡</span>Warnings<span class="nav-count">{{len .WarnIssues}}</span></a>
-    <a class="nav-link" href="#sec-notices"><span class="icon">🔵</span>Notices<span class="nav-count">{{len .NoticeIssues}}</span></a>
+    <a class="nav-link" href="#sec-errors"><span class="icon">●</span>Errors<span class="nav-count err">{{len .ErrorIssues}}</span></a>
+    <a class="nav-link" href="#sec-warnings"><span class="icon">●</span>Warnings<span class="nav-count">{{len .WarnIssues}}</span></a>
+    <a class="nav-link" href="#sec-notices"><span class="icon">●</span>Notices<span class="nav-count">{{len .NoticeIssues}}</span></a>
   </nav>
-  <div style="margin-top:auto;padding:16px 20px;font-size:11px;color:var(--faint);border-top:1px solid var(--border)">
-    Generated {{.CrawledAt.Format "Jan 02, 2006"}}<br>
+  <div class="nav-footer">
+    Generated {{.CrawledAt.Format "Jan 02, 2006 · 15:04 UTC"}}<br>
     {{.Stats.TotalChecksRun}} checks run
   </div>
 </aside>
@@ -525,7 +573,7 @@ tbody tr:hover td{background:var(--s2)}
         <div class="score-ring">
           <svg width="100" height="100" viewBox="0 0 120 120">
             <circle cx="60" cy="60" r="54" fill="none" stroke="var(--s3)" stroke-width="10"/>
-            <circle id="scoreArc" cx="60" cy="60" r="54" fill="none" stroke="#10b981" stroke-width="10"
+            <circle id="scoreArc" cx="60" cy="60" r="54" fill="none" stroke="#3fe56c" stroke-width="10"
               stroke-dasharray="339.3 339.3" stroke-linecap="round"
               style="transition:stroke-dasharray .8s ease"/>
           </svg>
@@ -543,7 +591,7 @@ tbody tr:hover td{background:var(--s2)}
         <div class="score-ring">
           <svg width="80" height="80" viewBox="0 0 120 120">
             <circle cx="60" cy="60" r="54" fill="none" stroke="var(--s3)" stroke-width="10"/>
-            <circle id="desktopArc" cx="60" cy="60" r="54" fill="none" stroke="#3b82f6" stroke-width="10"
+            <circle id="desktopArc" cx="60" cy="60" r="54" fill="none" stroke="#3fe56c" stroke-width="10"
               stroke-dasharray="339.3 339.3" stroke-linecap="round"
               style="transition:stroke-dasharray .8s ease"/>
           </svg>
@@ -552,7 +600,7 @@ tbody tr:hover td{background:var(--s2)}
             <div class="score-lbl" style="font-size:9px">/ 100</div>
           </div>
         </div>
-        <div style="font-size:13px;font-weight:800;color:#3b82f6">{{.DesktopGrade}}</div>
+        <div style="font-size:13px;font-weight:800;color:#3fe56c">{{.DesktopGrade}}</div>
       </div>
       <!-- Mobile score -->
       <div class="score-block">
@@ -560,7 +608,7 @@ tbody tr:hover td{background:var(--s2)}
         <div class="score-ring">
           <svg width="80" height="80" viewBox="0 0 120 120">
             <circle cx="60" cy="60" r="54" fill="none" stroke="var(--s3)" stroke-width="10"/>
-            <circle id="mobileArc" cx="60" cy="60" r="54" fill="none" stroke="#10b981" stroke-width="10"
+            <circle id="mobileArc" cx="60" cy="60" r="54" fill="none" stroke="#8ed793" stroke-width="10"
               stroke-dasharray="339.3 339.3" stroke-linecap="round"
               style="transition:stroke-dasharray .8s ease"/>
           </svg>
@@ -569,7 +617,7 @@ tbody tr:hover td{background:var(--s2)}
             <div class="score-lbl" style="font-size:9px">/ 100</div>
           </div>
         </div>
-        <div style="font-size:13px;font-weight:800;color:#10b981">{{.MobileGrade}}</div>
+        <div style="font-size:13px;font-weight:800;color:#8ed793">{{.MobileGrade}}</div>
       </div>
       {{end}}
     </div>
@@ -582,10 +630,10 @@ tbody tr:hover td{background:var(--s2)}
   <div class="metric-card warn"><div class="mc-label">Warnings</div><div class="mc-value warn">{{len .WarnIssues}}</div><div class="mc-sub">Should fix soon</div></div>
   <div class="metric-card notice"><div class="mc-label">Notices</div><div class="mc-value notice">{{len .NoticeIssues}}</div><div class="mc-sub">Improvements available</div></div>
   <div class="metric-card ok"><div class="mc-label">Pages Crawled</div><div class="mc-value ok">{{.PagesCrawled}}</div><div class="mc-sub">Depth-first BFS</div></div>
-  <div class="metric-card"><div class="mc-label">Overall Score</div><div class="mc-value" id="scoreCard" style="color:var(--green)">{{printf "%.1f" .HealthScore}}</div><div class="mc-sub">Grade: {{.Grade}}</div></div>
+  <div class="metric-card ok"><div class="mc-label">Overall Score</div><div class="mc-value ok" id="scoreCard">{{printf "%.1f" .HealthScore}}</div><div class="mc-sub">Grade: {{.Grade}}</div></div>
   {{if .HasMobileData}}
-  <div class="metric-card" style="border-left:3px solid #3b82f6"><div class="mc-label">🖥 Desktop Score</div><div class="mc-value" style="color:#3b82f6">{{printf "%.1f" .DesktopHealthScore}}</div><div class="mc-sub">Grade: {{.DesktopGrade}} · {{.DesktopStats.Errors}} err / {{.DesktopStats.Warnings}} warn</div></div>
-  <div class="metric-card" style="border-left:3px solid #10b981"><div class="mc-label">📱 Mobile Score</div><div class="mc-value" style="color:#10b981">{{printf "%.1f" .MobileHealthScore}}</div><div class="mc-sub">Grade: {{.MobileGrade}} · {{.MobileStats.Errors}} err / {{.MobileStats.Warnings}} warn</div></div>
+  <div class="metric-card" style="border-left:3px solid #3fe56c"><div class="mc-label">🖥 Desktop Score</div><div class="mc-value" style="color:#3fe56c">{{printf "%.1f" .DesktopHealthScore}}</div><div class="mc-sub">Grade: {{.DesktopGrade}} · {{.DesktopStats.Errors}} err / {{.DesktopStats.Warnings}} warn</div></div>
+  <div class="metric-card" style="border-left:3px solid #8ed793"><div class="mc-label">📱 Mobile Score</div><div class="mc-value" style="color:#8ed793">{{printf "%.1f" .MobileHealthScore}}</div><div class="mc-sub">Grade: {{.MobileGrade}} · {{.MobileStats.Errors}} err / {{.MobileStats.Warnings}} warn</div></div>
   {{else}}
   <div class="metric-card"><div class="mc-label">Categories</div><div class="mc-value">{{len .CategoryStats}}</div><div class="mc-sub">Checked</div></div>
   {{end}}
@@ -598,9 +646,9 @@ tbody tr:hover td{background:var(--s2)}
     <div class="donut-wrap">
       <canvas id="donut" width="120" height="120"></canvas>
       <div class="donut-legend">
-        <div class="dl-item"><div class="dl-dot" style="background:var(--red)"></div>Errors<div class="dl-val" style="color:var(--red)">{{len .ErrorIssues}}</div></div>
-        <div class="dl-item"><div class="dl-dot" style="background:var(--yellow)"></div>Warnings<div class="dl-val" style="color:var(--yellow)">{{len .WarnIssues}}</div></div>
-        <div class="dl-item"><div class="dl-dot" style="background:var(--blue)"></div>Notices<div class="dl-val" style="color:var(--blue)">{{len .NoticeIssues}}</div></div>
+        <div class="dl-item"><div class="dl-dot" style="background:var(--error)"></div>Errors<div class="dl-val" style="color:var(--error)">{{len .ErrorIssues}}</div></div>
+        <div class="dl-item"><div class="dl-dot" style="background:var(--warn)"></div>Warnings<div class="dl-val" style="color:var(--warn)">{{len .WarnIssues}}</div></div>
+        <div class="dl-item"><div class="dl-dot" style="background:var(--notice)"></div>Notices<div class="dl-val" style="color:var(--notice)">{{len .NoticeIssues}}</div></div>
       </div>
     </div>
   </div>
@@ -629,7 +677,7 @@ tbody tr:hover td{background:var(--s2)}
         {{if gt .Errors 0}}<span class="cc e">{{.Errors}} err</span>{{end}}
         {{if gt .Warnings 0}}<span class="cc w">{{.Warnings}} warn</span>{{end}}
         {{if gt .Notices 0}}<span class="cc n">{{.Notices}} notice</span>{{end}}
-        {{if eq .Total 0}}<span style="font-size:11px;color:var(--green)">✓ Clean</span>{{end}}
+        {{if eq .Total 0}}<span style="font-size:11px;color:var(--primary)">✓ Clean</span>{{end}}
       </div>
     </a>
     {{end}}
@@ -680,7 +728,7 @@ tbody tr:hover td{background:var(--s2)}
     <button class="filt-btn" id="fb-w" onclick="setGFilt('w',this)">Warnings</button>
     <button class="filt-btn" id="fb-n" onclick="setGFilt('n',this)">Notices</button>
     {{if .HasMobileData}}
-    <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+    <span style="width:1px;height:20px;background:rgba(60,74,60,.35);margin:0 4px"></span>
     <button class="filt-btn on" id="fp-all" onclick="setPFilt('all',this)">🌐 All</button>
     <button class="filt-btn" id="fp-d" onclick="setPFilt('desktop',this)">🖥 Desktop</button>
     <button class="filt-btn" id="fp-m" onclick="setPFilt('mobile',this)">📱 Mobile</button>
@@ -791,20 +839,43 @@ tbody tr:hover td{background:var(--s2)}
           <td><span class="{{statusBadge $p.StatusCode}}">{{$p.StatusCode}}</span></td>
           <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:12px">{{short $p.Title 50}}</td>
           <td style="font-variant-numeric:tabular-nums">{{$p.WordCount}}</td>
-          <td>{{if gt (len $p.CheckResults) 0}}<span class="pill" style="background:var(--redBg);color:var(--red)">{{len $p.CheckResults}}</span>{{else}}<span style="color:var(--green)">✓</span>{{end}}</td>
+          <td>{{if gt (len $p.CheckResults) 0}}<span class="pill" style="background:var(--error-bg);color:var(--error)">{{len $p.CheckResults}}</span>{{else}}<span style="color:var(--primary)">✓</span>{{end}}</td>
           <td>
             <div class="depth-pip">
               {{range $d := iterate $p.Depth}}<span class="dp fill"></span>{{end}}
             </div>
             <span style="font-size:11px;color:var(--muted);margin-left:4px">{{$p.Depth}}</span>
           </td>
-          <td>{{if $p.InSitemap}}<span style="color:var(--green)">✓</span>{{else}}<span style="color:var(--faint)">—</span>{{end}}</td>
+          <td>{{if $p.InSitemap}}<span style="color:var(--primary)">✓</span>{{else}}<span style="color:var(--faint)">—</span>{{end}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
   </div>
   <div class="pg-bar" id="pagePg"></div>
+</div>
+
+<!-- Checks Catalog -->
+<div id="checks" class="section">
+  <div class="section-header">
+    <h2>✦ Checks Catalog</h2>
+    <span class="section-badge">{{checkGroupCount .CheckGroups}} checks · {{len .CheckGroups}} categories</span>
+  </div>
+  {{range .CheckGroups}}
+  <div class="cat-section" style="margin-bottom:6px">
+    <div class="cat-section-hdr" onclick="toggleCat(this)">
+      <span style="font-size:15px">{{.Icon}}</span>
+      <span style="font-weight:600">{{.Category}}</span>
+      <span class="nav-count" style="margin-left:8px">{{len .Checks}}</span>
+      <span class="arrow">▶</span>
+    </div>
+    <div class="cat-section-body" style="padding:12px 16px 10px;display:flex;flex-wrap:wrap;gap:6px">
+      {{range .Checks}}
+      <code style="font-size:10px;background:var(--s3);padding:3px 9px;border-radius:4px;color:var(--muted)">{{.ID}}</code>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
 </div>
 
 </main>
@@ -814,12 +885,12 @@ tbody tr:hover td{background:var(--s2)}
 // ── Score ring animation ──────────────────────────────────────
 (function(){
   var circ = 339.3;
-  var colors = {A:'#10b981',B:'#3b82f6',C:'#f59e0b',D:'#f97316',F:'#ef4444'};
+  var colors = {A:'#3fe56c',B:'#8ed793',C:'#ffb7ae',D:'#ffb4ab',F:'#ffb4ab'};
 
   function animateRing(arcId, score, grade) {
     var arc = document.getElementById(arcId);
     if(!arc) return;
-    var col = colors[grade] || '#ef4444';
+    var col = colors[grade] || '#ffb4ab';
     arc.style.stroke = col;
     arc.style.strokeDasharray = (circ * score / 100) + ' ' + circ;
   }
@@ -831,7 +902,7 @@ tbody tr:hover td{background:var(--s2)}
   // Style overall grade pill
   var score = {{printf "%.1f" .HealthScore}};
   var grade = '{{.Grade}}';
-  var col = colors[grade] || '#ef4444';
+  var col = colors[grade] || '#ffb4ab';
   var pill = document.getElementById('gradePill');
   var sc = document.getElementById('scoreCard');
   if(pill){
@@ -849,8 +920,8 @@ tbody tr:hover td{background:var(--s2)}
   var ctx = c.getContext('2d');
   var E = {{len .ErrorIssues}}, W = {{len .WarnIssues}}, N = {{len .NoticeIssues}};
   var total = E + W + N;
-  if(total === 0){ ctx.fillStyle='#2a2d42'; ctx.beginPath(); ctx.arc(60,60,45,0,Math.PI*2); ctx.fill(); return; }
-  var data = [{v:E,c:'#ef4444'},{v:W,c:'#f59e0b'},{v:N,c:'#3b82f6'}];
+  if(total === 0){ ctx.fillStyle='#161c26'; ctx.beginPath(); ctx.arc(60,60,45,0,Math.PI*2); ctx.fill(); return; }
+  var data = [{v:E,c:'#ffb4ab'},{v:W,c:'#ffb7ae'},{v:N,c:'#8ed793'}];
   var start = -Math.PI/2;
   data.forEach(function(d){
     if(d.v===0) return;
@@ -861,7 +932,7 @@ tbody tr:hover td{background:var(--s2)}
     start+=angle;
   });
   ctx.beginPath(); ctx.arc(60,60,35,0,Math.PI*2);
-  ctx.fillStyle='#141620'; ctx.fill();
+  ctx.fillStyle='#0e131e'; ctx.fill();
 })();
 
 // ── Bar chart ─────────────────────────────────────────────────
@@ -878,7 +949,7 @@ tbody tr:hover td{background:var(--s2)}
   var maxVal = top.reduce(function(m,c){return Math.max(m,c.total)},0) || 1;
   top.forEach(function(cat){
     var pct = Math.round(cat.total/maxVal*100);
-    var fillCol = cat.errors>0?'#ef4444':cat.warnings>0?'#f59e0b':'#3b82f6';
+    var fillCol = cat.errors>0?'#ffb4ab':cat.warnings>0?'#ffb7ae':'#8ed793';
     el.innerHTML += '<div class="bc-row">' +
       '<div class="bc-label">'+cat.name+'</div>' +
       '<div class="bc-track"><div class="bc-fill" style="width:'+pct+'%;background:'+fillCol+'"></div></div>' +

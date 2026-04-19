@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Play, AlertCircle, Table as TableIcon, FileText, Globe2, Settings } from 'lucide-react'
+import { ArrowLeft, Play, AlertCircle, Table as TableIcon, FileText, Globe2, Settings, CheckSquare, Database } from 'lucide-react'
 import { useSSE } from '../hooks/useSSE'
 import { api } from '../lib/api'
 import CrawlProgress from '../components/CrawlProgress'
@@ -118,11 +118,25 @@ export default function AuditDetail() {
               <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Back to Observatory</span>
             </button>
             <button
+              onClick={() => navigate('/vault')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <Database size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Audit Vault</span>
+            </button>
+            <button
               onClick={() => navigate('/settings')}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
             >
               <Settings size={15} />
               <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Settings</span>
+            </button>
+            <button
+              onClick={() => navigate('/checks')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <CheckSquare size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Checks Catalog</span>
             </button>
           </nav>
         </div>

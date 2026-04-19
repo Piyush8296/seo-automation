@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Settings, RefreshCw, Globe2, ChevronDown, ChevronUp, Trash2, ExternalLink } from 'lucide-react'
+import { Play, Settings, Globe2, ChevronDown, ChevronUp, CheckSquare, Database, Info } from 'lucide-react'
 import { api } from '../lib/api'
 
 const DEFAULTS = {
@@ -15,105 +15,81 @@ const DEFAULTS = {
   discover_resources: true,
 }
 
-function accentColor(status) {
-  switch (status) {
-    case 'complete':  return '#3fe56c'
-    case 'running':   return '#8ed793'
-    case 'failed':    return '#ffb4ab'
-    default:          return '#3c4a3c'
-  }
+const TIPS = {
+  url:                    'The root URL to start crawling from. All pages within the same domain will be discovered and audited.',
+  max_depth:              'How many link-hops away from the root URL to crawl. Unlimited follows every internal link regardless of depth.',
+  max_pages:              'Hard cap on the total number of pages crawled. Unlimited means the entire site will be processed.',
+  timeout:                'Maximum time allowed per individual HTTP request. Increase for slow servers.',
+  concurrency:            'Number of pages fetched in parallel. Higher values finish faster but put more load on the target server.',
+  platform:               'Choose "Both" to run a full desktop + mobile bifurcated audit. "Desktop only" skips the mobile fetch. "Mobile focus" surfaces only mobile and mobile-vs-desktop issues.',
+  output_dir:             'Folder where HTML, JSON and Markdown reports are saved. Defaults to ~/.seo-reports if left blank.',
+  validate_external_links:'Sends a HEAD request to every outbound link to check for broken URLs. Significantly increases total crawl time.',
+  discover_resources:     'Validates every CSS, JavaScript and font file referenced by crawled pages. Very slow on large sites.',
 }
 
-function statusColor(status) {
-  switch (status) {
-    case 'complete':  return '#3fe56c'
-    case 'running':   return '#8ed793'
-    case 'failed':    return '#ffb4ab'
-    default:          return '#bbcbb8'
-  }
-}
+function Tooltip({ text }) {
+  const [visible, setVisible] = useState(false)
+  const [pos, setPos] = useState('top')
+  const ref = useRef(null)
 
-function fmt(dateStr) {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleString(undefined, {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
-}
-
-function SidebarAuditItem({ audit, onDelete, onRerun, navigate }) {
-  const [deleting, setDeleting] = useState(false)
-  const handleDelete = async (e) => {
-    e.stopPropagation()
-    setDeleting(true)
-    try { await onDelete(audit.id) } finally { setDeleting(false) }
+  const show = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect()
+      setPos(rect.top < 80 ? 'bottom' : 'top')
+    }
+    setVisible(true)
   }
+
   return (
-    <div
-      className="relative group px-4 py-3 hover:bg-surface-bright cursor-pointer transition-colors"
-      onClick={() => navigate(`/audit/${audit.id}`)}
+    <span
+      ref={ref}
+      className="relative inline-flex items-center"
+      onMouseEnter={show}
+      onMouseLeave={() => setVisible(false)}
     >
-      <div
-        className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full"
-        style={{ background: accentColor(audit.status) }}
-      />
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColor(audit.status) }} />
-            <span className="text-on-surface text-xs font-medium truncate">{
-              audit.url.replace(/^https?:\/\//, '').replace(/\/$/, '')
-            }</span>
-          </div>
-          <div className="flex items-center gap-2" style={{ fontSize: '9px' }}>
-            <span className="text-on-surface-variant">{fmt(audit.created_at)}</span>
-            {audit.grade && (
-              <span className="font-bold font-display" style={{ color: statusColor(audit.status) }}>
-                {audit.grade}
-              </span>
-            )}
-            {audit.error_count > 0 && (
-              <span style={{ color: '#ffb4ab' }}>{audit.error_count} err</span>
-            )}
-          </div>
-        </div>
-        <div
-          className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          onClick={(e) => e.stopPropagation()}
+      <Info size={11} className="text-on-surface-variant/50 hover:text-on-surface-variant cursor-help transition-colors" />
+      {visible && (
+        <span
+          className="absolute z-50 w-64 rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
+          style={{
+            background: '#1a202a',
+            border: '1px solid rgba(60,74,60,0.5)',
+            color: '#bbcbb8',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            ...(pos === 'top'
+              ? { bottom: 'calc(100% + 8px)' }
+              : { top: 'calc(100% + 8px)' }),
+          }}
         >
-          <button
-            onClick={(e) => { e.stopPropagation(); onRerun(audit) }}
-            className="p-1 text-on-surface-variant hover:text-primary rounded transition-colors"
-            title="Re-run"
-          >
-            <Play size={11} />
-          </button>
-          <a
-            href={api.reportURL(audit.id)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1 text-on-surface-variant hover:text-on-surface rounded transition-colors"
-            title="Open report"
-          >
-            <ExternalLink size={11} />
-          </a>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="p-1 rounded transition-colors"
-            style={{ color: '#ffb4ab' }}
-            title="Delete"
-          >
-            <Trash2 size={11} />
-          </button>
-        </div>
-      </div>
-    </div>
+          {text}
+          <span
+            className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rotate-45"
+            style={{
+              background: '#1a202a',
+              border: '1px solid rgba(60,74,60,0.5)',
+              ...(pos === 'top'
+                ? { bottom: '-5px', borderTop: 'none', borderLeft: 'none' }
+                : { top: '-5px', borderBottom: 'none', borderRight: 'none' }),
+            }}
+          />
+        </span>
+      )}
+    </span>
+  )
+}
+
+function Label({ children, tip }) {
+  return (
+    <label className="label mb-2 flex items-center gap-1.5">
+      {children}
+      {tip && <Tooltip text={tip} />}
+    </label>
   )
 }
 
 export default function Home() {
-  const [audits, setAudits] = useState([])
-  const [historyLoading, setHistoryLoading] = useState(true)
   const [starting, setStarting] = useState(false)
   const [checkCount, setCheckCount] = useState(null)
   const [form, setForm] = useState(DEFAULTS)
@@ -121,31 +97,11 @@ export default function Home() {
   const [formError, setFormError] = useState('')
   const navigate = useNavigate()
 
-  const fetchAudits = useCallback(async () => {
-    try {
-      const data = await api.listAudits()
-      setAudits(data ?? [])
-    } catch (e) {
-      console.error('Failed to load audits:', e)
-    } finally {
-      setHistoryLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchAudits() }, [fetchAudits])
-
   useEffect(() => {
     api.getCheckCatalog()
       .then((c) => setCheckCount(c?.total ?? null))
       .catch(() => {})
   }, [])
-
-  useEffect(() => {
-    const hasRunning = audits.some((a) => a.status === 'running')
-    if (!hasRunning) return
-    const t = setInterval(fetchAudits, 3000)
-    return () => clearInterval(t)
-  }, [audits, fetchAudits])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -170,20 +126,10 @@ export default function Home() {
     }
   }
 
-  const handleDelete = async (id) => {
-    await api.deleteAudit(id)
-    setAudits((prev) => prev.filter((a) => a.id !== id))
-  }
-
-  const handleRerun = async (audit) => {
-    const record = await api.startAudit(audit.config)
-    navigate(`/audit/${record.id}`)
-  }
-
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
 
-      {/* ── Left Sidebar: nav + audit history ── */}
+      {/* ── Left Sidebar: nav ── */}
       <aside
         className="w-64 flex flex-col shrink-0 h-full"
         style={{ background: '#161c26' }}
@@ -210,76 +156,33 @@ export default function Home() {
               <span className="uppercase tracking-widest font-medium" style={{ fontSize: '9px' }}>Observatory</span>
             </div>
             <button
+              onClick={() => navigate('/vault')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <Database size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Audit Vault</span>
+            </button>
+            <button
               onClick={() => navigate('/settings')}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
             >
               <Settings size={15} />
               <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Settings</span>
             </button>
+            <button
+              onClick={() => navigate('/checks')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <CheckSquare size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Checks Catalog</span>
+              {checkCount != null && (
+                <span className="ml-auto text-on-surface-variant font-mono" style={{ fontSize: '9px', background: '#2f3540', padding: '1px 5px', borderRadius: '8px' }}>
+                  {checkCount}
+                </span>
+              )}
+            </button>
           </nav>
         </div>
-
-        {/* Audit history */}
-        <div
-          className="shrink-0 flex items-center justify-between px-4 py-2"
-          style={{ borderTop: '1px solid rgba(60,74,60,0.3)' }}
-        >
-          <span className="uppercase tracking-widest text-on-surface-variant" style={{ fontSize: '9px' }}>
-            Audit Vault
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-on-surface-variant" style={{ fontSize: '9px' }}>{audits.length}</span>
-            <button
-              onClick={fetchAudits}
-              className="p-1 text-on-surface-variant hover:text-primary transition-colors rounded"
-              title="Refresh"
-            >
-              <RefreshCw size={10} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {historyLoading ? (
-            <div className="flex justify-center py-8">
-              <span
-                className="w-5 h-5 rounded-full animate-spin"
-                style={{ border: '2px solid #2f3540', borderTopColor: '#3fe56c' }}
-              />
-            </div>
-          ) : audits.length === 0 ? (
-            <p className="text-center text-on-surface-variant/50 text-xs py-8 px-4">
-              No audits yet
-            </p>
-          ) : (
-            <div className="flex flex-col">
-              {audits.map((a) => (
-                <SidebarAuditItem
-                  key={a.id}
-                  audit={a}
-                  onDelete={handleDelete}
-                  onRerun={handleRerun}
-                  navigate={navigate}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Check count badge */}
-        {checkCount !== null && (
-          <div
-            className="px-4 py-3 shrink-0"
-            style={{ borderTop: '1px solid rgba(60,74,60,0.3)' }}
-          >
-            <span
-              className="text-xs px-2 py-1 rounded-full"
-              style={{ background: 'rgba(63,229,108,0.1)', color: '#3fe56c' }}
-            >
-              {checkCount} checks active
-            </span>
-          </div>
-        )}
       </aside>
 
       {/* ── Main Content ── */}
@@ -310,9 +213,9 @@ export default function Home() {
         <main className="flex-1 overflow-y-auto p-8">
           <form onSubmit={handleStart} className="max-w-2xl mx-auto flex flex-col gap-6">
 
-            {/* URL input — hero input */}
+            {/* URL input */}
             <div>
-              <label className="label mb-2">Target Domain URL</label>
+              <Label tip={TIPS.url}>Target Domain URL</Label>
               <div className="relative">
                 <input
                   type="url"
@@ -333,7 +236,7 @@ export default function Home() {
             {/* Crawl parameter grid */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="label">Crawl Depth</label>
+                <Label tip={TIPS.max_depth}>Crawl Depth</Label>
                 <select value={form.max_depth} onChange={(e) => set('max_depth', e.target.value)} className="input" disabled={starting}>
                   <option value={-1}>Unlimited</option>
                   <option value={1}>1 level</option>
@@ -343,7 +246,7 @@ export default function Home() {
                 </select>
               </div>
               <div>
-                <label className="label">Max Pages</label>
+                <Label tip={TIPS.max_pages}>Max Pages</Label>
                 <select value={form.max_pages} onChange={(e) => set('max_pages', e.target.value)} className="input" disabled={starting}>
                   <option value={0}>Unlimited</option>
                   <option value={50}>50</option>
@@ -353,7 +256,7 @@ export default function Home() {
                 </select>
               </div>
               <div>
-                <label className="label">Timeout</label>
+                <Label tip={TIPS.timeout}>Timeout</Label>
                 <select value={form.timeout} onChange={(e) => set('timeout', e.target.value)} className="input" disabled={starting}>
                   <option value="10s">10 seconds</option>
                   <option value="30s">30 seconds</option>
@@ -365,7 +268,7 @@ export default function Home() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="label">Concurrent Workers — {form.concurrency}</label>
+                <Label tip={TIPS.concurrency}>Concurrent Workers — {form.concurrency}</Label>
                 <input
                   type="range" min={1} max={20} step={1}
                   value={form.concurrency}
@@ -379,7 +282,7 @@ export default function Home() {
                 </div>
               </div>
               <div>
-                <label className="label">Platform</label>
+                <Label tip={TIPS.platform}>Platform</Label>
                 <select value={form.platform} onChange={(e) => set('platform', e.target.value)} className="input" disabled={starting}>
                   <option value="">Both (bifurcated)</option>
                   <option value="desktop">Desktop only</option>
@@ -401,7 +304,7 @@ export default function Home() {
             {advanced && (
               <div className="flex flex-col gap-4 rounded-xl p-5" style={{ background: '#161c26' }}>
                 <div>
-                  <label className="label">Custom output directory</label>
+                  <Label tip={TIPS.output_dir}>Custom output directory</Label>
                   <input
                     type="text"
                     placeholder="~/.seo-reports (default)"
@@ -422,7 +325,10 @@ export default function Home() {
                       disabled={starting}
                     />
                     <div>
-                      <div className="text-sm text-on-surface">Validate external links</div>
+                      <div className="text-sm text-on-surface flex items-center gap-1.5">
+                        Validate external links
+                        <Tooltip text={TIPS.validate_external_links} />
+                      </div>
                       <div className="text-xs text-on-surface-variant">HEAD-check every outbound link. Adds crawl time.</div>
                     </div>
                   </label>
@@ -436,7 +342,10 @@ export default function Home() {
                       disabled={starting}
                     />
                     <div>
-                      <div className="text-sm text-on-surface">Discover sub-resources (CSS, JS, fonts)</div>
+                      <div className="text-sm text-on-surface flex items-center gap-1.5">
+                        Discover sub-resources (CSS, JS, fonts)
+                        <Tooltip text={TIPS.discover_resources} />
+                      </div>
                       <div className="text-xs text-on-surface-variant">Validates stylesheets, scripts and fonts. Slow.</div>
                     </div>
                   </label>

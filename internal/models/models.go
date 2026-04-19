@@ -47,6 +47,13 @@ const (
 	SitemapModeOff SitemapMode = "off"
 )
 
+// CheckDescriptor describes a registered check for catalog display.
+type CheckDescriptor struct {
+	ID          string `json:"id"`
+	Category    string `json:"category"`
+	Description string `json:"description"`
+}
+
 // CheckResult is a single SEO finding on a page or site-wide
 type CheckResult struct {
 	ID       string   `json:"id"`
@@ -303,6 +310,7 @@ type CrawlConfig struct {
 	Platform              Platform
 	ValidateExternalLinks bool
 	DiscoverResources     bool
+	SkipLinkHosts         []string // hostnames to skip during external link validation
 	// OnProgress is called after each page is successfully crawled.
 	// crawled = total pages done so far; currentURL = the URL just processed.
 	// Safe to leave nil.

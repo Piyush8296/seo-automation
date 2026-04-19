@@ -58,15 +58,41 @@ function statusColor(code) {
   return '#bbcbb8'
 }
 
+const STARTUP_STEPS = [
+  'Connecting to server…',
+  'Fetching robots.txt…',
+  'Resolving sitemap…',
+  'Seeding crawl queue…',
+  'Launching workers…',
+]
+
 export default function CrawlProgress({ crawled, currentURL, maxPages, onCancel }) {
   const elapsedSecs = useElapsedSecs()
-  const [log, setLog] = useState([])
+  const [log, setLog] = useState([{ url: STARTUP_STEPS[0], status: null, ms: null }])
+  const [started, setStarted] = useState(false)
   const logRef = useRef(null)
   const progress = maxPages > 0 ? Math.min((crawled / maxPages) * 100, 100) : null
 
+  // Cycle through startup messages every 2s while no URL has arrived yet
+  useEffect(() => {
+    if (started) return
+    let step = 1
+    const t = setInterval(() => {
+      if (step < STARTUP_STEPS.length) {
+        setLog([{ url: STARTUP_STEPS[step], status: null, ms: null }])
+        step++
+      }
+    }, 2000)
+    return () => clearInterval(t)
+  }, [started])
+
   useEffect(() => {
     if (!currentURL) return
-    setLog((prev) => [{ url: currentURL, status: 200, ms: Math.floor(Math.random() * 180) + 10 }, ...prev].slice(0, 60))
+    setStarted(true)
+    setLog((prev) => {
+      const base = prev.length === 1 && prev[0].status === null ? [] : prev
+      return [{ url: currentURL, status: 200, ms: Math.floor(Math.random() * 180) + 10 }, ...base].slice(0, 60)
+    })
   }, [currentURL])
 
   const speed = elapsedSecs > 0 ? (crawled / elapsedSecs).toFixed(1) : '0.0'
@@ -175,21 +201,25 @@ export default function CrawlProgress({ crawled, currentURL, maxPages, onCancel 
 
         {/* Log entries */}
         <div ref={logRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-          {log.length === 0 ? (
-            <p className="text-center text-on-surface-variant/40 text-xs mt-8">Waiting for activity…</p>
-          ) : (
-            log.map((entry, i) => (
-              <div key={i} className="flex items-start gap-2.5 font-mono" style={{ fontSize: '10px' }}>
+          {log.map((entry, i) => (
+            <div key={i} className="flex items-start gap-2.5 font-mono" style={{ fontSize: '10px' }}>
+              {entry.status !== null ? (
                 <span className="shrink-0 font-bold" style={{ color: statusColor(entry.status) }}>
                   {entry.status}
                 </span>
-                <div className="min-w-0">
-                  <p className="text-on-surface truncate">{entry.url}</p>
+              ) : (
+                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary animate-pulse mt-1" />
+              )}
+              <div className="min-w-0">
+                <p className={entry.status === null ? 'text-on-surface-variant italic' : 'text-on-surface truncate'}>
+                  {entry.url}
+                </p>
+                {entry.ms !== null && (
                   <p className="text-on-surface-variant/40" style={{ fontSize: '9px' }}>{entry.ms}ms</p>
-                </div>
+                )}
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
 
         {/* Cancel footer */}

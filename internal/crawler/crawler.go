@@ -174,7 +174,7 @@ done:
 	audit.PagesTotal = len(pages)
 
 	if c.config.ValidateExternalLinks {
-		ValidateExternalLinks(ctx, pages, c.config.UserAgent)
+		ValidateExternalLinks(ctx, pages, c.config.UserAgent, c.config.SkipLinkHosts)
 	}
 
 	if c.config.DiscoverResources {

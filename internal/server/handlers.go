@@ -153,10 +153,36 @@ func (h *Handlers) serveReportJSON(w http.ResponseWriter, r *http.Request, id st
 	http.ServeFile(w, r, h.storage.ReportPath(id, "json"))
 }
 
+// ── GET /api/settings ────────────────────────────────────────────────────────
+
+func (h *Handlers) getSettings(w http.ResponseWriter, r *http.Request) {
+	cfg := h.manager.GetSettings()
+	writeJSON(w, http.StatusOK, cfg)
+}
+
+// ── PUT /api/settings ────────────────────────────────────────────────────────
+
+func (h *Handlers) updateSettings(w http.ResponseWriter, r *http.Request) {
+	var cfg AppSettings
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	h.manager.UpdateSettings(cfg)
+	writeJSON(w, http.StatusOK, cfg)
+}
+
 // ── GET /api/checks ──────────────────────────────────────────────────────────
 
 func (h *Handlers) listChecks(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, checks.GetCatalog())
+	cat := checks.GetCatalog()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"total":       cat.Total,
+		"page_checks": cat.PageChecks,
+		"site_checks": cat.SiteChecks,
+		"check_ids":   cat.CheckIDs,
+		"checks":      checks.GetCheckDescriptors(),
+	})
 }
 
 // ── GET /api/audits/diff?a={id}&b={id} ───────────────────────────────────────
