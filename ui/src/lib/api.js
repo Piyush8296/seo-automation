@@ -31,7 +31,14 @@ export const api = {
   diffAudits: (a, b) =>
     fetch(`${BASE}/audits/diff?a=${a}&b=${b}`).then(handleResponse),
 
+  getCheckCatalog: () =>
+    fetch(`${BASE}/checks`).then(handleResponse),
+
   eventsURL: (id) => `${BASE}/audits/${id}/events`,
   reportURL: (id) => `${BASE}/audits/${id}/report.html`,
   reportDownloadURL: (id) => `${BASE}/audits/${id}/report.html`,
+  reportJSONURL: (id) => `${BASE}/audits/${id}/report.json`,
+
+  getReportJSON: (id) =>
+    fetch(`${BASE}/audits/${id}/report.json`).then(handleResponse),
 }

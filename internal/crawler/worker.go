@@ -44,6 +44,7 @@ func ProcessURL(
 	page.ResponseTimeMs = result.ResponseTimeMs
 	page.RedirectChain = result.RedirectChain
 	page.HTMLSizeBytes = len(result.Body)
+	page.TLSInfo = result.TLSInfo
 
 	if result.Error != "" {
 		page.Error = result.Error
@@ -53,6 +54,13 @@ func ProcessURL(
 	// Extract headers
 	page.Headers = parser.ExtractHeaders(result.Headers)
 	page.ContentType = parser.GetHeader(page.Headers, "content-type")
+
+	// X-Robots-Tag comes from HTTP headers, so extract it for all responses
+	xrt := strings.TrimSpace(page.Headers["x-robots-tag"])
+	if xrt != "" {
+		page.XRobotsTag = xrt
+		page.RobotsDirectives, _ = parser.ParseRobotsDirectives(page.RobotsTag, page.Headers)
+	}
 
 	// Only parse HTML pages
 	if !isHTMLContent(page.ContentType) {
@@ -71,11 +79,15 @@ func ProcessURL(
 	page.MetaDesc = extracted.MetaDesc
 	page.Canonical = extracted.Canonical
 	page.RobotsTag = extracted.RobotsTag
+	page.RobotsDirectives = extracted.RobotsDirectives
+	page.XRobotsTag = extracted.XRobotsTag
 	page.H1s = extracted.H1s
 	page.H2s = extracted.H2s
 	page.H3s = extracted.H3s
 	page.Links = extracted.Links
 	page.Images = extracted.Images
+	page.Resources = extracted.Resources
+	page.FontFaceNoDisplay = extracted.FontFaceNoDisplay
 	page.SchemaJSONRaw = extracted.SchemaJSONRaw
 	page.OGTags = extracted.OGTags
 	page.TwitterTags = extracted.TwitterTags
@@ -89,6 +101,9 @@ func ProcessURL(
 	page.InlineCSSBytes = extracted.InlineCSSBytes
 	page.HasViewport = extracted.HasViewport
 	page.ViewportContent = extracted.ViewportContent
+
+	// Validate images (HEAD requests for file size, content-type, broken detection)
+	ValidateImages(ctx, page.Images, config.UserAgent)
 
 	// Collect discovered internal URLs
 	var discovered []string

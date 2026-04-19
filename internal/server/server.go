@@ -44,6 +44,15 @@ func New(baseDir, uiDir string) (*Server, error) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	// Check catalog (read-only introspection)
+	mux.HandleFunc("/api/checks", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.listChecks(w, r)
+	})
+
 	// Root collection: list + create
 	mux.HandleFunc("/api/audits", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

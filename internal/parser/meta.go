@@ -37,6 +37,33 @@ func ExtractMeta(doc *goquery.Document) (title, metaDesc, canonical, robotsTag, 
 	return
 }
 
+// ParseRobotsDirectives merges directives from <meta name="robots"> and
+// the X-Robots-Tag HTTP header into a deduplicated, lowercased slice.
+func ParseRobotsDirectives(metaContent string, headers map[string]string) (directives []string, xRobotsRaw string) {
+	seen := map[string]bool{}
+	for _, d := range strings.Split(metaContent, ",") {
+		d = strings.TrimSpace(d)
+		if d != "" && !seen[d] {
+			seen[d] = true
+			directives = append(directives, d)
+		}
+	}
+	xRobotsRaw = strings.TrimSpace(headers["x-robots-tag"])
+	if xRobotsRaw != "" {
+		for _, d := range strings.Split(strings.ToLower(xRobotsRaw), ",") {
+			d = strings.TrimSpace(d)
+			if idx := strings.Index(d, ":"); idx != -1 {
+				d = strings.TrimSpace(d[idx+1:])
+			}
+			if d != "" && !seen[d] {
+				seen[d] = true
+				directives = append(directives, d)
+			}
+		}
+	}
+	return
+}
+
 // ExtractOGTags returns all og: Open Graph meta properties.
 func ExtractOGTags(doc *goquery.Document) map[string]string {
 	tags := make(map[string]string)
