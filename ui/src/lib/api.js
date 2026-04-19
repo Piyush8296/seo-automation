@@ -34,6 +34,16 @@ export const api = {
   getCheckCatalog: () =>
     fetch(`${BASE}/checks`).then(handleResponse),
 
+  getSettings: () =>
+    fetch(`${BASE}/settings`).then(handleResponse),
+
+  updateSettings: (cfg) =>
+    fetch(`${BASE}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    }).then(handleResponse),
+
   eventsURL: (id) => `${BASE}/audits/${id}/events`,
   reportURL: (id) => `${BASE}/audits/${id}/report.html`,
   reportDownloadURL: (id) => `${BASE}/audits/${id}/report.html`,

@@ -24,19 +24,38 @@ const (
 
 // Manager orchestrates the lifecycle of audit runs.
 type Manager struct {
-	storage *Storage
-	hub     *Hub
-	mu      sync.Mutex
-	cancels map[string]context.CancelFunc
+	storage    *Storage
+	hub        *Hub
+	mu         sync.Mutex
+	cancels    map[string]context.CancelFunc
+	settingsMu sync.RWMutex
+	settings   AppSettings
 }
 
 // NewManager creates a Manager backed by the given Storage and Hub.
 func NewManager(storage *Storage, hub *Hub) *Manager {
 	return &Manager{
-		storage: storage,
-		hub:     hub,
-		cancels: make(map[string]context.CancelFunc),
+		storage:  storage,
+		hub:      hub,
+		cancels:  make(map[string]context.CancelFunc),
+		settings: AppSettings{SkipLinkHosts: DefaultSkipLinkHosts},
 	}
+}
+
+// GetSettings returns a copy of the current settings.
+func (m *Manager) GetSettings() AppSettings {
+	m.settingsMu.RLock()
+	defer m.settingsMu.RUnlock()
+	cp := m.settings
+	cp.SkipLinkHosts = append([]string(nil), m.settings.SkipLinkHosts...)
+	return cp
+}
+
+// UpdateSettings replaces the current settings atomically.
+func (m *Manager) UpdateSettings(cfg AppSettings) {
+	m.settingsMu.Lock()
+	defer m.settingsMu.Unlock()
+	m.settings = cfg
 }
 
 // StartAudit validates the request, persists an initial record, and launches the
@@ -114,6 +133,8 @@ func (m *Manager) runAudit(ctx context.Context, id string, req StartAuditRequest
 	}
 	noMobile := platform == models.PlatformDesktop
 
+	cfg := m.GetSettings()
+
 	config := &models.CrawlConfig{
 		SeedURL:       req.URL,
 		MaxDepth:      req.MaxDepth,
@@ -126,6 +147,7 @@ func (m *Manager) runAudit(ctx context.Context, id string, req StartAuditRequest
 		Platform:              platform,
 		ValidateExternalLinks: req.ValidateExternalLinks,
 		DiscoverResources:     req.DiscoverResources,
+		SkipLinkHosts:         cfg.SkipLinkHosts,
 		OnProgress: func(crawled int, currentURL string) {
 			m.hub.Broadcast(id, ProgressEvent{
 				Type:         "progress",
