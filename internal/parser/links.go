@@ -80,9 +80,57 @@ func ExtractLinks(doc *goquery.Document, baseURL string) []models.Link {
 			Rel:        rel,
 			IsInternal: isInternal,
 			IsFollow:   isFollow,
+			Position:   classifyLinkPosition(s),
 		})
 	})
 	return links
+}
+
+// classifyLinkPosition walks the link's ancestors and returns the position of
+// the nearest semantic container (nav, header, footer, aside, main/article).
+// Defaults to content when no semantic ancestor is found.
+func classifyLinkPosition(s *goquery.Selection) models.LinkPosition {
+	pos := models.LinkPosition("")
+	s.Parents().EachWithBreak(func(_ int, p *goquery.Selection) bool {
+		tag := goquery.NodeName(p)
+		role := strings.ToLower(strings.TrimSpace(p.AttrOr("role", "")))
+		id := strings.ToLower(strings.TrimSpace(p.AttrOr("id", "")))
+		class := strings.ToLower(p.AttrOr("class", ""))
+
+		switch {
+		case tag == "nav" || role == "navigation":
+			pos = models.PositionNav
+		case tag == "footer" || role == "contentinfo" || idOrClassHas(id, class, "footer"):
+			pos = models.PositionFooter
+		case tag == "header" || role == "banner" || idOrClassHas(id, class, "header"):
+			pos = models.PositionHeader
+		case tag == "aside" || role == "complementary" || idOrClassHas(id, class, "sidebar"):
+			pos = models.PositionSidebar
+		case tag == "main" || tag == "article" || role == "main":
+			pos = models.PositionContent
+		default:
+			return true
+		}
+		return false
+	})
+	if pos == "" {
+		return models.PositionContent
+	}
+	return pos
+}
+
+// idOrClassHas reports whether the id equals name or any class token equals name
+// (exact token match to avoid false positives like "subheader" matching "header").
+func idOrClassHas(id, class, name string) bool {
+	if id == name {
+		return true
+	}
+	for _, c := range strings.Fields(class) {
+		if c == name {
+			return true
+		}
+	}
+	return false
 }
 
 // HasMixedContent returns true if an HTTPS page loads HTTP resources.
@@ -153,6 +201,90 @@ func GetInlineCSSBytes(doc *goquery.Document) int {
 		total += len(s.Text())
 	})
 	return total
+}
+
+// ExtractResources discovers CSS, JS, and font sub-resources referenced by the page.
+// Deduplicates by URL across discovery sources.
+func ExtractResources(doc *goquery.Document, baseURL string) []models.Resource {
+	var resources []models.Resource
+	seen := make(map[string]bool)
+
+	add := func(raw string, rtype models.ResourceType) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return
+		}
+		abs, err := resolveURL(raw, baseURL)
+		if err != nil || !isHTTPScheme(abs) {
+			return
+		}
+		key := string(rtype) + "|" + abs
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		resources = append(resources, models.Resource{
+			URL:        abs,
+			Type:       rtype,
+			IsInternal: sameHost(abs, baseURL),
+		})
+	}
+
+	doc.Find("script[src]").Each(func(_ int, s *goquery.Selection) {
+		add(s.AttrOr("src", ""), models.ResourceScript)
+	})
+
+	doc.Find("link[rel]").Each(func(_ int, s *goquery.Selection) {
+		rel := strings.ToLower(s.AttrOr("rel", ""))
+		href := s.AttrOr("href", "")
+		if strings.Contains(rel, "stylesheet") {
+			add(href, models.ResourceCSS)
+			return
+		}
+		if strings.Contains(rel, "preload") {
+			as := strings.ToLower(s.AttrOr("as", ""))
+			switch as {
+			case "font":
+				add(href, models.ResourceFont)
+			case "style":
+				add(href, models.ResourceCSS)
+			case "script":
+				add(href, models.ResourceScript)
+			}
+		}
+	})
+
+	return resources
+}
+
+// CountFontFaceNoDisplay scans inline <style> tags for @font-face blocks missing font-display.
+func CountFontFaceNoDisplay(doc *goquery.Document) int {
+	count := 0
+	doc.Find("style").Each(func(_ int, s *goquery.Selection) {
+		css := strings.ToLower(s.Text())
+		idx := 0
+		for {
+			found := strings.Index(css[idx:], "@font-face")
+			if found == -1 {
+				break
+			}
+			start := idx + found
+			brace := strings.Index(css[start:], "{")
+			if brace == -1 {
+				break
+			}
+			end := strings.Index(css[start+brace:], "}")
+			if end == -1 {
+				break
+			}
+			block := css[start+brace : start+brace+end]
+			if !strings.Contains(block, "font-display") {
+				count++
+			}
+			idx = start + brace + end + 1
+		}
+	})
+	return count
 }
 
 // HasPreconnect checks if the page has any <link rel="preconnect"> tags.

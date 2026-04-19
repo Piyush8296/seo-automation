@@ -19,8 +19,10 @@ import (
 	"github.com/cars24/seo-automation/internal/checks/mobile_desktop"
 	"github.com/cars24/seo-automation/internal/checks/pagination"
 	"github.com/cars24/seo-automation/internal/checks/performance"
+	"github.com/cars24/seo-automation/internal/checks/resources"
 	"github.com/cars24/seo-automation/internal/checks/sitemapcheck"
 	"github.com/cars24/seo-automation/internal/checks/social"
+	"github.com/cars24/seo-automation/internal/checks/ssl"
 	"github.com/cars24/seo-automation/internal/checks/structured_data"
 	"github.com/cars24/seo-automation/internal/checks/url_structure"
 	"github.com/cars24/seo-automation/internal/models"
@@ -101,6 +103,12 @@ func init() {
 	for _, c := range eeat.PageChecks() {
 		pageChecks = append(pageChecks, c)
 	}
+	for _, c := range ssl.PageChecks() {
+		pageChecks = append(pageChecks, c)
+	}
+	for _, c := range resources.PageChecks() {
+		pageChecks = append(pageChecks, c)
+	}
 
 	// ── Site-wide checks (original) ──────────────────────────────────────────
 	for _, c := range crawlability.SiteChecks() {
@@ -143,6 +151,22 @@ func init() {
 	}
 	for _, c := range eeat.SiteChecks() {
 		siteChecks = append(siteChecks, c)
+	}
+}
+
+// Catalog describes the registered check surface for introspection via API.
+type Catalog struct {
+	Total      int `json:"total"`
+	PageChecks int `json:"page_checks"`
+	SiteChecks int `json:"site_checks"`
+}
+
+// GetCatalog returns the count of registered check runners.
+func GetCatalog() Catalog {
+	return Catalog{
+		Total:      len(pageChecks) + len(siteChecks),
+		PageChecks: len(pageChecks),
+		SiteChecks: len(siteChecks),
 	}
 }
 
