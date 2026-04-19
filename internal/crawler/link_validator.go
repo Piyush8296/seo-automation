@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -20,10 +21,32 @@ type linkResult struct {
 	Timeout    bool
 }
 
+// buildSkipSet converts a slice of hostnames into a fast lookup map.
+func buildSkipSet(hosts []string) map[string]bool {
+	set := make(map[string]bool, len(hosts))
+	for _, h := range hosts {
+		set[strings.ToLower(h)] = true
+	}
+	return set
+}
+
+func shouldSkip(rawURL string, skipSet map[string]bool) bool {
+	if len(skipSet) == 0 {
+		return false
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return skipSet[strings.ToLower(u.Hostname())]
+}
+
 // ValidateExternalLinks performs concurrent HEAD requests against every unique
 // external URL found across all pages. Results are fanned back onto each Link
 // struct so the check layer can inspect StatusCode and Timeout.
-func ValidateExternalLinks(ctx context.Context, pages []*models.PageData, ua string) {
+func ValidateExternalLinks(ctx context.Context, pages []*models.PageData, ua string, skipHosts []string) {
+	skipSet := buildSkipSet(skipHosts)
+
 	// Collect unique external URLs and map them to their Link pointers.
 	urlLinks := make(map[string][]*models.Link)
 	for _, p := range pages {
@@ -34,6 +57,9 @@ func ValidateExternalLinks(ctx context.Context, pages []*models.PageData, ua str
 			}
 			src := link.URL
 			if src == "" || (!strings.HasPrefix(src, "http://") && !strings.HasPrefix(src, "https://")) {
+				continue
+			}
+			if shouldSkip(src, skipSet) {
 				continue
 			}
 			urlLinks[src] = append(urlLinks[src], link)

@@ -248,6 +248,7 @@ type CrawlConfig struct {
 	Platform              Platform
 	ValidateExternalLinks bool
 	DiscoverResources     bool
+	SkipLinkHosts         []string // hostnames to skip during external link validation
 	// OnProgress is called after each page is successfully crawled.
 	// crawled = total pages done so far; currentURL = the URL just processed.
 	// Safe to leave nil.
