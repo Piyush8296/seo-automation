@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Globe2, Settings, ArrowLeft, CheckSquare, Search, ChevronDown, ChevronRight } from 'lucide-react'
+import { Globe2, Settings, ArrowLeft, CheckSquare, Search, ChevronDown, ChevronRight, Database } from 'lucide-react'
 import { api } from '../lib/api'
 
 const CAT_ICONS = {
@@ -86,6 +86,13 @@ export default function ChecksCatalog() {
             >
               <ArrowLeft size={15} />
               <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Observatory</span>
+            </button>
+            <button
+              onClick={() => navigate('/vault')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <Database size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Audit Vault</span>
             </button>
             <button
               onClick={() => navigate('/settings')}

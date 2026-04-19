@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Settings, RefreshCw, Globe2, ChevronDown, ChevronUp, Trash2, ExternalLink, CheckSquare } from 'lucide-react'
+import { Play, Settings, Globe2, ChevronDown, ChevronUp, CheckSquare, Database } from 'lucide-react'
 import { api } from '../lib/api'
 
 const DEFAULTS = {
@@ -15,105 +15,8 @@ const DEFAULTS = {
   discover_resources: true,
 }
 
-function accentColor(status) {
-  switch (status) {
-    case 'complete':  return '#3fe56c'
-    case 'running':   return '#8ed793'
-    case 'failed':    return '#ffb4ab'
-    default:          return '#3c4a3c'
-  }
-}
-
-function statusColor(status) {
-  switch (status) {
-    case 'complete':  return '#3fe56c'
-    case 'running':   return '#8ed793'
-    case 'failed':    return '#ffb4ab'
-    default:          return '#bbcbb8'
-  }
-}
-
-function fmt(dateStr) {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleString(undefined, {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
-}
-
-function SidebarAuditItem({ audit, onDelete, onRerun, navigate }) {
-  const [deleting, setDeleting] = useState(false)
-  const handleDelete = async (e) => {
-    e.stopPropagation()
-    setDeleting(true)
-    try { await onDelete(audit.id) } finally { setDeleting(false) }
-  }
-  return (
-    <div
-      className="relative group px-4 py-3 hover:bg-surface-bright cursor-pointer transition-colors"
-      onClick={() => navigate(`/audit/${audit.id}`)}
-    >
-      <div
-        className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full"
-        style={{ background: accentColor(audit.status) }}
-      />
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColor(audit.status) }} />
-            <span className="text-on-surface text-xs font-medium truncate">{
-              audit.url.replace(/^https?:\/\//, '').replace(/\/$/, '')
-            }</span>
-          </div>
-          <div className="flex items-center gap-2" style={{ fontSize: '9px' }}>
-            <span className="text-on-surface-variant">{fmt(audit.created_at)}</span>
-            {audit.grade && (
-              <span className="font-bold font-display" style={{ color: statusColor(audit.status) }}>
-                {audit.grade}
-              </span>
-            )}
-            {audit.error_count > 0 && (
-              <span style={{ color: '#ffb4ab' }}>{audit.error_count} err</span>
-            )}
-          </div>
-        </div>
-        <div
-          className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={(e) => { e.stopPropagation(); onRerun(audit) }}
-            className="p-1 text-on-surface-variant hover:text-primary rounded transition-colors"
-            title="Re-run"
-          >
-            <Play size={11} />
-          </button>
-          <a
-            href={api.reportURL(audit.id)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1 text-on-surface-variant hover:text-on-surface rounded transition-colors"
-            title="Open report"
-          >
-            <ExternalLink size={11} />
-          </a>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="p-1 rounded transition-colors"
-            style={{ color: '#ffb4ab' }}
-            title="Delete"
-          >
-            <Trash2 size={11} />
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function Home() {
-  const [audits, setAudits] = useState([])
-  const [historyLoading, setHistoryLoading] = useState(true)
   const [starting, setStarting] = useState(false)
   const [checkCount, setCheckCount] = useState(null)
   const [form, setForm] = useState(DEFAULTS)
@@ -121,31 +24,11 @@ export default function Home() {
   const [formError, setFormError] = useState('')
   const navigate = useNavigate()
 
-  const fetchAudits = useCallback(async () => {
-    try {
-      const data = await api.listAudits()
-      setAudits(data ?? [])
-    } catch (e) {
-      console.error('Failed to load audits:', e)
-    } finally {
-      setHistoryLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchAudits() }, [fetchAudits])
-
   useEffect(() => {
     api.getCheckCatalog()
       .then((c) => setCheckCount(c?.total ?? null))
       .catch(() => {})
   }, [])
-
-  useEffect(() => {
-    const hasRunning = audits.some((a) => a.status === 'running')
-    if (!hasRunning) return
-    const t = setInterval(fetchAudits, 3000)
-    return () => clearInterval(t)
-  }, [audits, fetchAudits])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -168,16 +51,6 @@ export default function Home() {
       setFormError(err.message)
       setStarting(false)
     }
-  }
-
-  const handleDelete = async (id) => {
-    await api.deleteAudit(id)
-    setAudits((prev) => prev.filter((a) => a.id !== id))
-  }
-
-  const handleRerun = async (audit) => {
-    const record = await api.startAudit(audit.config)
-    navigate(`/audit/${record.id}`)
   }
 
   return (
@@ -217,6 +90,13 @@ export default function Home() {
               <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Settings</span>
             </button>
             <button
+              onClick={() => navigate('/vault')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <Database size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Audit Vault</span>
+            </button>
+            <button
               onClick={() => navigate('/checks')}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
             >
@@ -230,68 +110,6 @@ export default function Home() {
             </button>
           </nav>
         </div>
-
-        {/* Audit history */}
-        <div
-          className="shrink-0 flex items-center justify-between px-4 py-2"
-          style={{ borderTop: '1px solid rgba(60,74,60,0.3)' }}
-        >
-          <span className="uppercase tracking-widest text-on-surface-variant" style={{ fontSize: '9px' }}>
-            Audit Vault
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-on-surface-variant" style={{ fontSize: '9px' }}>{audits.length}</span>
-            <button
-              onClick={fetchAudits}
-              className="p-1 text-on-surface-variant hover:text-primary transition-colors rounded"
-              title="Refresh"
-            >
-              <RefreshCw size={10} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {historyLoading ? (
-            <div className="flex justify-center py-8">
-              <span
-                className="w-5 h-5 rounded-full animate-spin"
-                style={{ border: '2px solid #2f3540', borderTopColor: '#3fe56c' }}
-              />
-            </div>
-          ) : audits.length === 0 ? (
-            <p className="text-center text-on-surface-variant/50 text-xs py-8 px-4">
-              No audits yet
-            </p>
-          ) : (
-            <div className="flex flex-col">
-              {audits.map((a) => (
-                <SidebarAuditItem
-                  key={a.id}
-                  audit={a}
-                  onDelete={handleDelete}
-                  onRerun={handleRerun}
-                  navigate={navigate}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Check count badge */}
-        {checkCount !== null && (
-          <div
-            className="px-4 py-3 shrink-0"
-            style={{ borderTop: '1px solid rgba(60,74,60,0.3)' }}
-          >
-            <span
-              className="text-xs px-2 py-1 rounded-full"
-              style={{ background: 'rgba(63,229,108,0.1)', color: '#3fe56c' }}
-            >
-              {checkCount} checks active
-            </span>
-          </div>
-        )}
       </aside>
 
       {/* ── Main Content ── */}
