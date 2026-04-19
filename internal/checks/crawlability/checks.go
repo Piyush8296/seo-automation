@@ -18,6 +18,11 @@ func PageChecks() []models.PageCheck {
 		&redirect302Permanent{},
 		&noindexHasInlinks{},
 		&pageDepthTooDeep{},
+		&robotsNofollowPage{},
+		&robotsNoarchive{},
+		&robotsNosnippet{},
+		&robotsXRobotsTag{},
+		&robotsDirectiveConflict{},
 	}
 }
 
@@ -173,6 +178,118 @@ func (pd *pageDepthTooDeep) Run(p *models.PageData) []models.CheckResult {
 		}}
 	}
 	return nil
+}
+
+// --- Robots directive checks (Feature 1.1) ---
+
+type robotsNofollowPage struct{}
+
+func (c *robotsNofollowPage) Run(p *models.PageData) []models.CheckResult {
+	for _, d := range p.RobotsDirectives {
+		if d == "nofollow" {
+			return []models.CheckResult{{
+				ID:       "crawl.robots.nofollow_page",
+				Category: "Crawlability",
+				Severity: models.SeverityWarning,
+				Message:  "Page has nofollow robots directive — outgoing links will not pass PageRank",
+				URL:      p.URL,
+				Details:  "Source: " + directiveSource(p, "nofollow"),
+			}}
+		}
+	}
+	return nil
+}
+
+type robotsNoarchive struct{}
+
+func (c *robotsNoarchive) Run(p *models.PageData) []models.CheckResult {
+	for _, d := range p.RobotsDirectives {
+		if d == "noarchive" {
+			return []models.CheckResult{{
+				ID:       "crawl.robots.noarchive",
+				Category: "Crawlability",
+				Severity: models.SeverityNotice,
+				Message:  "Page has noarchive directive — cached version unavailable in search",
+				URL:      p.URL,
+				Details:  "Source: " + directiveSource(p, "noarchive"),
+			}}
+		}
+	}
+	return nil
+}
+
+type robotsNosnippet struct{}
+
+func (c *robotsNosnippet) Run(p *models.PageData) []models.CheckResult {
+	for _, d := range p.RobotsDirectives {
+		if d == "nosnippet" {
+			return []models.CheckResult{{
+				ID:       "crawl.robots.nosnippet",
+				Category: "Crawlability",
+				Severity: models.SeverityWarning,
+				Message:  "Page has nosnippet directive — no text snippet will appear in search results",
+				URL:      p.URL,
+				Details:  "Source: " + directiveSource(p, "nosnippet"),
+			}}
+		}
+	}
+	return nil
+}
+
+type robotsXRobotsTag struct{}
+
+func (c *robotsXRobotsTag) Run(p *models.PageData) []models.CheckResult {
+	if p.XRobotsTag != "" {
+		return []models.CheckResult{{
+			ID:       "crawl.robots.x_robots_tag",
+			Category: "Crawlability",
+			Severity: models.SeverityNotice,
+			Message:  "X-Robots-Tag HTTP header is present",
+			URL:      p.URL,
+			Details:  p.XRobotsTag,
+		}}
+	}
+	return nil
+}
+
+type robotsDirectiveConflict struct{}
+
+func (c *robotsDirectiveConflict) Run(p *models.PageData) []models.CheckResult {
+	set := make(map[string]bool, len(p.RobotsDirectives))
+	for _, d := range p.RobotsDirectives {
+		set[d] = true
+	}
+	var conflicts []string
+	if set["index"] && set["noindex"] {
+		conflicts = append(conflicts, "index + noindex")
+	}
+	if set["follow"] && set["nofollow"] {
+		conflicts = append(conflicts, "follow + nofollow")
+	}
+	if len(conflicts) > 0 {
+		return []models.CheckResult{{
+			ID:       "crawl.robots.directive_conflict",
+			Category: "Crawlability",
+			Severity: models.SeverityError,
+			Message:  "Conflicting robots directives detected",
+			URL:      p.URL,
+			Details:  strings.Join(conflicts, "; "),
+		}}
+	}
+	return nil
+}
+
+func directiveSource(p *models.PageData, directive string) string {
+	inMeta := strings.Contains(p.RobotsTag, directive)
+	inHeader := p.XRobotsTag != "" && strings.Contains(strings.ToLower(p.XRobotsTag), directive)
+	switch {
+	case inMeta && inHeader:
+		return "meta robots + X-Robots-Tag"
+	case inHeader:
+		return "X-Robots-Tag"
+	default:
+		return "meta robots"
+	}
 }
 
 // --- Site-wide checks ---

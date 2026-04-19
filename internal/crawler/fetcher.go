@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,7 @@ type FetchResult struct {
 	Body          []byte
 	ResponseTimeMs int64
 	RedirectChain []models.RedirectHop
+	TLSInfo       *models.TLSInfo
 	Error         string
 }
 
@@ -118,6 +120,43 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) *FetchResult {
 		Body:           body,
 		ResponseTimeMs: elapsed,
 		RedirectChain:  redirectChain,
+		TLSInfo:        extractTLSInfo(resp.TLS),
+	}
+}
+
+// extractTLSInfo converts a tls.ConnectionState into our TLSInfo model.
+func extractTLSInfo(state *tls.ConnectionState) *models.TLSInfo {
+	if state == nil {
+		return nil
+	}
+	info := &models.TLSInfo{
+		Version:     tlsVersionName(state.Version),
+		CipherSuite: tls.CipherSuiteName(state.CipherSuite),
+		ChainLength: len(state.PeerCertificates),
+	}
+	if len(state.PeerCertificates) > 0 {
+		leaf := state.PeerCertificates[0]
+		info.CertSubject = leaf.Subject.CommonName
+		info.CertIssuer = leaf.Issuer.CommonName
+		info.CertNotBefore = leaf.NotBefore
+		info.CertNotAfter = leaf.NotAfter
+		info.CertDNSNames = leaf.DNSNames
+	}
+	return info
+}
+
+func tlsVersionName(v uint16) string {
+	switch v {
+	case tls.VersionTLS10:
+		return "TLS 1.0"
+	case tls.VersionTLS11:
+		return "TLS 1.1"
+	case tls.VersionTLS12:
+		return "TLS 1.2"
+	case tls.VersionTLS13:
+		return "TLS 1.3"
+	default:
+		return fmt.Sprintf("unknown (0x%04x)", v)
 	}
 }
 

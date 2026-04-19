@@ -10,3 +10,6 @@ reports/
 
 # OS
 .DS_Store
+
+# Internal planning docs (local-only)
+FEATURE_ROADMAP.md

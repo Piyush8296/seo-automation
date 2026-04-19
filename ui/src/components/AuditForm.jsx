@@ -9,6 +9,8 @@ const DEFAULTS = {
   timeout: '30s',
   platform: '',
   output_dir: '',
+  validate_external_links: true,
+  discover_resources: true,
 }
 
 export default function AuditForm({ onSubmit, loading }) {
@@ -163,6 +165,45 @@ export default function AuditForm({ onSubmit, loading }) {
               className="input"
               disabled={loading}
             />
+          </div>
+
+          {/* Opt-in slow checks */}
+          <div className="col-span-2 border-t border-gray-800 pt-4 mt-1 flex flex-col gap-3">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={form.validate_external_links}
+                onChange={(e) => set('validate_external_links', e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-gray-800 accent-emerald-500"
+                disabled={loading}
+              />
+              <div>
+                <div className="text-sm text-gray-200 group-hover:text-white">
+                  Validate external links
+                </div>
+                <div className="text-xs text-gray-500">
+                  HEAD-check every outbound link for 4xx/5xx/timeouts. Adds significant crawl time.
+                </div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={form.discover_resources}
+                onChange={(e) => set('discover_resources', e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-gray-800 accent-emerald-500"
+                disabled={loading}
+              />
+              <div>
+                <div className="text-sm text-gray-200 group-hover:text-white">
+                  Discover sub-resources (CSS, JS, fonts)
+                </div>
+                <div className="text-xs text-gray-500">
+                  Fetch and validate every stylesheet, script and font. Detects broken assets and `font-display` issues. Slow.
+                </div>
+              </div>
+            </label>
           </div>
         </div>
       )}

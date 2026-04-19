@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cars24/seo-automation/internal/checks"
+	"github.com/cars24/seo-automation/internal/checks/content_body"
 	"github.com/cars24/seo-automation/internal/crawler"
 	"github.com/cars24/seo-automation/internal/models"
 	"github.com/cars24/seo-automation/internal/report"
@@ -26,7 +27,10 @@ var (
 	flagFormats     string
 	flagOutputDir   string
 	flagExitCode    bool
-	flagPlatform    string
+	flagPlatform         string
+	flagValidateExtLinks bool
+	flagDiscoverResources bool
+	flagSimHashDistance  int
 )
 
 var auditCmd = &cobra.Command{
@@ -51,6 +55,9 @@ func init() {
 	auditCmd.Flags().StringVar(&flagOutputDir, "output-dir", "./reports", "Output directory for reports")
 	auditCmd.Flags().BoolVar(&flagExitCode, "exit-code", false, "Exit 1 if any errors found")
 	auditCmd.Flags().StringVar(&flagPlatform, "platform", "", "Focus platform: desktop, mobile, or all (default: show both, bifurcated)")
+	auditCmd.Flags().BoolVar(&flagValidateExtLinks, "validate-external-links", false, "Validate external links via HEAD requests (slow, disabled by default)")
+	auditCmd.Flags().BoolVar(&flagDiscoverResources, "discover-resources", false, "Discover CSS/JS/font sub-resources and HEAD-validate them (slow, disabled by default)")
+	auditCmd.Flags().IntVar(&flagSimHashDistance, "simhash-distance", 0, "Override Hamming-distance threshold for near-duplicate detection (0 = use default of 3). Higher = more pages flagged as near-duplicate.")
 	_ = auditCmd.MarkFlagRequired("url")
 }
 
@@ -78,7 +85,9 @@ func runAudit(cmd *cobra.Command, args []string) error {
 		NoMobileCheck: noMobile,
 		UserAgent:     "SEOAuditBot/1.0 (+https://github.com/cars24/seo-automation)",
 		MobileUA:      "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-		Platform:      platform,
+		Platform:              platform,
+		ValidateExternalLinks: flagValidateExtLinks,
+		DiscoverResources:     flagDiscoverResources,
 	}
 
 	platformLabel := "desktop + mobile (bifurcated)"
@@ -101,6 +110,12 @@ func runAudit(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, " max-pages=unlimited")
 	}
 	fmt.Fprintf(os.Stderr, " concurrency=%d platform=%s\n", flagConcurrency, platformLabel)
+	if flagValidateExtLinks {
+		fmt.Fprintf(os.Stderr, "  external link validation: enabled\n")
+	}
+	if flagDiscoverResources {
+		fmt.Fprintf(os.Stderr, "  sub-resource discovery: enabled\n")
+	}
 
 	c := crawler.NewCrawler(config)
 	audit, err := c.Crawl(context.Background())
@@ -109,6 +124,12 @@ func runAudit(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(os.Stderr, "Crawled %d pages, running checks...\n", audit.PagesCrawled)
+
+	// Apply near-duplicate threshold override if the CLI flag was set.
+	if flagSimHashDistance > 0 {
+		content_body.SetSimHashMaxDistanceOverride(flagSimHashDistance)
+		fmt.Fprintf(os.Stderr, "  simhash-distance override: %d (default %d)\n", flagSimHashDistance, content_body.SimHashMaxDistance)
+	}
 
 	// Run per-page checks
 	for _, page := range audit.Pages {
