@@ -1,16 +1,45 @@
 # Go
 seo-audit
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
 
 # Frontend
 ui/node_modules/
 ui/dist/
+ui/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Reports
 reports/
 
 # OS
 .DS_Store
+Thumbs.db
 __pycache__/
+*.pyc
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Logs & temp
+*.log
+tmp/
+.cache/
 
 # Claude Code (local agent state, worktrees, launch config)
 .claude/
