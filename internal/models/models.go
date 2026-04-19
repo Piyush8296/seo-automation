@@ -25,6 +25,13 @@ const (
 	PlatformDiff    Platform = "diff"
 )
 
+// CheckDescriptor describes a registered check for catalog display.
+type CheckDescriptor struct {
+	ID          string `json:"id"`
+	Category    string `json:"category"`
+	Description string `json:"description"`
+}
+
 // CheckResult is a single SEO finding on a page or site-wide
 type CheckResult struct {
 	ID       string   `json:"id"`

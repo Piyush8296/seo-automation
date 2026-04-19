@@ -156,7 +156,14 @@ func (h *Handlers) serveReportJSON(w http.ResponseWriter, r *http.Request, id st
 // ── GET /api/checks ──────────────────────────────────────────────────────────
 
 func (h *Handlers) listChecks(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, checks.GetCatalog())
+	cat := checks.GetCatalog()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"total":       cat.Total,
+		"page_checks": cat.PageChecks,
+		"site_checks": cat.SiteChecks,
+		"check_ids":   cat.CheckIDs,
+		"checks":      checks.GetCheckDescriptors(),
+	})
 }
 
 // ── GET /api/audits/diff?a={id}&b={id} ───────────────────────────────────────
