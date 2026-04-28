@@ -3,7 +3,9 @@ package crawlability
 import (
 	"fmt"
 	"net/url"
+	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/cars24/seo-automation/internal/models"
@@ -15,6 +17,7 @@ var (
 	jsRedirectPattern     = regexp.MustCompile(`(?is)\b(?:window\.)?location(?:\.href)?\s*=|\b(?:window\.)?location\.(?:replace|assign)\s*\(`)
 	metaRefreshPattern    = regexp.MustCompile(`(?is)<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>`)
 	metaRefreshAltPattern = regexp.MustCompile(`(?is)<meta\b[^>]*content\s*=\s*["'][^"']*;\s*url\s*=[^"']+["'][^>]*>`)
+	soft404Phrases        = []string{"404", "page not found", "not found", "does not exist", "doesn't exist", "could not be found", "no longer exists", "no longer available", "listing unavailable", "listing expired", "vehicle unavailable", "car unavailable"}
 )
 
 // PageChecks returns per-page crawlability checks.
@@ -23,6 +26,10 @@ func PageChecks() []models.PageCheck {
 		&response4xx{},
 		&response5xx{},
 		&responseTimeout{},
+		&responseSoft404{},
+		&responseImageNon200{},
+		&responseContentTypeMismatch{},
+		&responseVaryHeaderInvalid{},
 		&redirectChain{},
 		&redirectLoop{},
 		&redirect302Permanent{},
@@ -99,6 +106,104 @@ func (r *responseTimeout) Run(p *models.PageData) []models.CheckResult {
 			Message:  "Request timed out",
 			URL:      p.URL,
 			Details:  p.Error,
+		}}
+	}
+	return nil
+}
+
+type responseSoft404 struct{}
+
+func (r *responseSoft404) Run(p *models.PageData) []models.CheckResult {
+	if p.StatusCode != 200 || !looksLikeHTMLResponse(p) {
+		return nil
+	}
+	signal := soft404Signal(p)
+	if signal == "" {
+		return nil
+	}
+	return []models.CheckResult{{
+		ID:       "crawl.response.soft_404",
+		Category: redirectCategory,
+		Severity: models.SeverityWarning,
+		Message:  "Page returns 200 but appears to be a soft 404",
+		URL:      p.URL,
+		Details:  signal,
+	}}
+}
+
+type responseImageNon200 struct{}
+
+func (r *responseImageNon200) Run(p *models.PageData) []models.CheckResult {
+	var results []models.CheckResult
+	for _, img := range p.Images {
+		if img.StatusCode == 0 || img.StatusCode == 200 {
+			continue
+		}
+		details := img.Src
+		if img.ContentType != "" {
+			details += " content-type=" + img.ContentType
+		}
+		results = append(results, models.CheckResult{
+			ID:       "crawl.response.image_non_200",
+			Category: redirectCategory,
+			Severity: models.SeverityError,
+			Message:  fmt.Sprintf("Image does not return HTTP 200 (got %d)", img.StatusCode),
+			URL:      p.URL,
+			Details:  details,
+		})
+	}
+	return results
+}
+
+type responseContentTypeMismatch struct{}
+
+func (r *responseContentTypeMismatch) Run(p *models.PageData) []models.CheckResult {
+	if p.StatusCode != 200 {
+		return nil
+	}
+	expected := expectedContentKind(firstNonEmpty(p.FinalURL, p.URL))
+	if expected == "" {
+		return nil
+	}
+	contentType := normalizeContentType(p.ContentType)
+	if contentType == "" || contentKindMatches(expected, contentType) {
+		return nil
+	}
+	return []models.CheckResult{{
+		ID:       "crawl.response.content_type_mismatch",
+		Category: redirectCategory,
+		Severity: models.SeverityWarning,
+		Message:  "URL returns 200 with an unexpected Content-Type",
+		URL:      p.URL,
+		Details:  fmt.Sprintf("expected=%s content-type=%s", expected, p.ContentType),
+	}}
+}
+
+type responseVaryHeaderInvalid struct{}
+
+func (r *responseVaryHeaderInvalid) Run(p *models.PageData) []models.CheckResult {
+	if p.StatusCode != 200 || !isCacheableResponse(p.Headers) {
+		return nil
+	}
+	vary := strings.ToLower(p.Headers["vary"])
+	if strings.Contains(vary, "*") {
+		return []models.CheckResult{{
+			ID:       "crawl.response.vary_header_invalid",
+			Category: redirectCategory,
+			Severity: models.SeverityWarning,
+			Message:  "Cacheable response uses Vary: *",
+			URL:      p.URL,
+			Details:  "vary=" + p.Headers["vary"],
+		}}
+	}
+	if p.Headers["content-encoding"] != "" && !headerListContains(vary, "accept-encoding") {
+		return []models.CheckResult{{
+			ID:       "crawl.response.vary_header_invalid",
+			Category: redirectCategory,
+			Severity: models.SeverityWarning,
+			Message:  "Compressed cacheable response is missing Vary: Accept-Encoding",
+			URL:      p.URL,
+			Details:  fmt.Sprintf("content-encoding=%s vary=%s", p.Headers["content-encoding"], p.Headers["vary"]),
 		}}
 	}
 	return nil
@@ -795,4 +900,131 @@ func uniqueStrings(values []string) []string {
 		unique = append(unique, value)
 	}
 	return unique
+}
+
+func looksLikeHTMLResponse(p *models.PageData) bool {
+	contentType := normalizeContentType(p.ContentType)
+	return contentType == "" || strings.Contains(contentType, "html")
+}
+
+func soft404Signal(p *models.PageData) string {
+	titleAndHeadings := strings.ToLower(strings.Join(append([]string{p.Title}, p.H1s...), " "))
+	for _, phrase := range soft404Phrases {
+		if strings.Contains(titleAndHeadings, phrase) {
+			return "title/h1 contains " + phrase
+		}
+	}
+	body := strings.ToLower(p.BodyText)
+	if body == "" {
+		return ""
+	}
+	for _, phrase := range soft404Phrases {
+		if phrase == "not found" {
+			continue
+		}
+		if strings.Contains(body, phrase) && p.WordCount <= 160 {
+			return "short body contains " + phrase
+		}
+	}
+	return ""
+}
+
+func expectedContentKind(rawURL string) string {
+	u := parsedURL(rawURL)
+	if u == nil {
+		return ""
+	}
+	ext := strings.ToLower(path.Ext(u.Path))
+	switch ext {
+	case ".html", ".htm", ".php", ".asp", ".aspx", ".jsp":
+		return "html"
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg", ".bmp", ".ico":
+		return "image"
+	case ".css":
+		return "css"
+	case ".js", ".mjs":
+		return "javascript"
+	case ".json":
+		return "json"
+	case ".xml":
+		return "xml"
+	case ".pdf":
+		return "pdf"
+	case ".txt":
+		return "text"
+	default:
+		return ""
+	}
+}
+
+func normalizeContentType(contentType string) string {
+	if i := strings.Index(contentType, ";"); i >= 0 {
+		contentType = contentType[:i]
+	}
+	return strings.ToLower(strings.TrimSpace(contentType))
+}
+
+func contentKindMatches(expected string, contentType string) bool {
+	switch expected {
+	case "html":
+		return contentType == "text/html" || contentType == "application/xhtml+xml"
+	case "image":
+		return strings.HasPrefix(contentType, "image/")
+	case "css":
+		return contentType == "text/css"
+	case "javascript":
+		return contentType == "application/javascript" || contentType == "text/javascript" || contentType == "application/x-javascript"
+	case "json":
+		return contentType == "application/json" || strings.HasSuffix(contentType, "+json")
+	case "xml":
+		return contentType == "application/xml" || contentType == "text/xml" || strings.HasSuffix(contentType, "+xml")
+	case "pdf":
+		return contentType == "application/pdf"
+	case "text":
+		return strings.HasPrefix(contentType, "text/plain")
+	default:
+		return true
+	}
+}
+
+func isCacheableResponse(headers map[string]string) bool {
+	if headers == nil {
+		return false
+	}
+	cacheControl := strings.ToLower(headers["cache-control"])
+	if strings.Contains(cacheControl, "no-store") || strings.Contains(cacheControl, "private") {
+		return false
+	}
+	if strings.Contains(cacheControl, "public") || strings.Contains(cacheControl, "immutable") {
+		return true
+	}
+	if directiveInt(cacheControl, "max-age") > 0 || directiveInt(cacheControl, "s-maxage") > 0 {
+		return true
+	}
+	return strings.TrimSpace(headers["expires"]) != ""
+}
+
+func directiveInt(header string, directive string) int {
+	for _, part := range strings.Split(header, ",") {
+		part = strings.TrimSpace(part)
+		if !strings.HasPrefix(part, directive+"=") {
+			continue
+		}
+		raw := strings.TrimSpace(strings.TrimPrefix(part, directive+"="))
+		value, err := strconv.Atoi(raw)
+		if err == nil {
+			return value
+		}
+	}
+	return 0
+}
+
+func headerListContains(header string, token string) bool {
+	token = strings.ToLower(token)
+	for _, part := range strings.Split(header, ",") {
+		if strings.TrimSpace(strings.ToLower(part)) == token {
+			return true
+		}
+	}
+	return false
 }
