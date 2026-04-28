@@ -251,14 +251,23 @@ var checklistIDMap = map[string][]string{
 	// Structured Data
 	"schema.article.missing_fields":        {"SCHEMA-013"},
 	"schema.breadcrumb.invalid":            {"SCHEMA-003"},
+	"schema.event.missing":                 {"SCHEMA-019"},
 	"schema.faq.invalid":                   {"SCHEMA-004"},
+	"schema.hidden_content_mismatch":       {"SCHEMA-010"},
+	"schema.howto.missing":                 {"SCHEMA-012"},
 	"schema.jsonld.duplicate_type":         {"SCHEMA-015"},
 	"schema.jsonld.invalid_json":           {"SCHEMA-008", "SCHEMA-017"},
 	"schema.jsonld.missing":                {"SCHEMA-016"},
 	"schema.jsonld.missing_context":        {"SCHEMA-015"},
 	"schema.jsonld.missing_type":           {"SCHEMA-015"},
+	"schema.lazy_loaded_risk":              {"SCHEMA-009"},
 	"schema.organization.missing_homepage": {"SCHEMA-001"},
+	"schema.product_list.missing":          {"SCHEMA-018"},
 	"schema.product.missing_fields":        {"SCHEMA-002", "SCHEMA-011"},
+	"schema.review_rating.missing":         {"SCHEMA-005"},
+	"schema.speakable.missing":             {"SCHEMA-020"},
+	"schema.website.missing_homepage":      {"SCHEMA-014"},
+	"schema.website.searchaction_missing":  {"SCHEMA-007"},
 
 	// Titles
 	"title.duplicate": {"TITLE-002"},

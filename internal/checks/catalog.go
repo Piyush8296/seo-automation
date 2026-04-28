@@ -247,14 +247,23 @@ var checkDescriptors = []models.CheckDescriptor{
 	// ── Structured Data ─────────────────────────────────────────────────────
 	{ID: "schema.article.missing_fields", Category: "Structured Data", Description: "Article schema is missing required fields (headline, author, or datePublished)."},
 	{ID: "schema.breadcrumb.invalid", Category: "Structured Data", Description: "BreadcrumbList schema has invalid or missing item properties."},
+	{ID: "schema.event.missing", Category: "Structured Data", Description: "Event-like page is missing Event schema."},
 	{ID: "schema.faq.invalid", Category: "Structured Data", Description: "FAQPage schema has invalid structure or missing question/answer pairs."},
+	{ID: "schema.hidden_content_mismatch", Category: "Structured Data", Description: "Schema contains FAQ or HowTo content that is not visible on the page."},
+	{ID: "schema.howto.missing", Category: "Structured Data", Description: "Guide or process page appears eligible for HowTo schema but does not include it."},
 	{ID: "schema.jsonld.duplicate_type", Category: "Structured Data", Description: "Multiple JSON-LD blocks on this page define the same schema type."},
 	{ID: "schema.jsonld.invalid_json", Category: "Structured Data", Description: "JSON-LD block contains malformed JSON that cannot be parsed by search engines."},
 	{ID: "schema.jsonld.missing", Category: "Structured Data", Description: "Page has no structured data markup (JSON-LD, Microdata, or RDFa)."},
 	{ID: "schema.jsonld.missing_context", Category: "Structured Data", Description: "JSON-LD block is missing the required @context property (should be schema.org)."},
 	{ID: "schema.jsonld.missing_type", Category: "Structured Data", Description: "JSON-LD block is missing the required @type property."},
+	{ID: "schema.lazy_loaded_risk", Category: "Structured Data", Description: "JSON-LD schema appears empty or lazy-loaded instead of present in raw HTML."},
 	{ID: "schema.organization.missing_homepage", Category: "Structured Data", Description: "Organization schema on the homepage is missing or has an invalid URL field."},
+	{ID: "schema.product_list.missing", Category: "Structured Data", Description: "Listing or category page is missing ItemList/ProductList structured data."},
 	{ID: "schema.product.missing_fields", Category: "Structured Data", Description: "Product schema is missing recommended fields (price, availability, or rating)."},
+	{ID: "schema.review_rating.missing", Category: "Structured Data", Description: "Car detail page is missing Review or AggregateRating schema."},
+	{ID: "schema.speakable.missing", Category: "Structured Data", Description: "News article page is missing SpeakableSpecification schema."},
+	{ID: "schema.website.missing_homepage", Category: "Structured Data", Description: "Homepage is missing WebSite structured data."},
+	{ID: "schema.website.searchaction_missing", Category: "Structured Data", Description: "WebSite schema is missing SearchAction for sitelinks searchbox."},
 
 	// ── Titles ──────────────────────────────────────────────────────────────
 	{ID: "title.duplicate", Category: "Titles", Description: "Multiple pages share the same title tag, reducing uniqueness in search results."},
