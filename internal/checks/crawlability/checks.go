@@ -2,9 +2,19 @@ package crawlability
 
 import (
 	"fmt"
+	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/cars24/seo-automation/internal/models"
+)
+
+const redirectCategory = "Crawlability"
+
+var (
+	jsRedirectPattern     = regexp.MustCompile(`(?is)\b(?:window\.)?location(?:\.href)?\s*=|\b(?:window\.)?location\.(?:replace|assign)\s*\(`)
+	metaRefreshPattern    = regexp.MustCompile(`(?is)<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>`)
+	metaRefreshAltPattern = regexp.MustCompile(`(?is)<meta\b[^>]*content\s*=\s*["'][^"']*;\s*url\s*=[^"']+["'][^>]*>`)
 )
 
 // PageChecks returns per-page crawlability checks.
@@ -16,6 +26,12 @@ func PageChecks() []models.PageCheck {
 		&redirectChain{},
 		&redirectLoop{},
 		&redirect302Permanent{},
+		&redirectHTTPToHTTPSPermanent{},
+		&redirectWWWVariantPermanent{},
+		&redirectTrailingSlashPermanent{},
+		&redirectJavascript{},
+		&redirectMetaRefresh{},
+		&redirectDestinationIndexable{},
 		&noindexHasInlinks{},
 		&pageDepthTooDeep{},
 		&robotsNofollowPage{},
@@ -35,6 +51,7 @@ func SiteChecks() []models.SiteCheck {
 		&noindexInSitemapSite{},
 		&orphanExternalOnly{},
 		&robotsPageBlockedButLinked{},
+		&redirectTrailingSlashSiteConsistency{},
 	}
 }
 
@@ -93,10 +110,11 @@ func (r *redirectChain) Run(p *models.PageData) []models.CheckResult {
 	if len(p.RedirectChain) > 3 {
 		return []models.CheckResult{{
 			ID:       "crawl.redirect.chain",
-			Category: "Crawlability",
+			Category: redirectCategory,
 			Severity: models.SeverityWarning,
 			Message:  fmt.Sprintf("Redirect chain too long (%d hops)", len(p.RedirectChain)),
 			URL:      p.URL,
+			Details:  redirectChainDetails(p),
 		}}
 	}
 	return nil
@@ -109,10 +127,11 @@ func (r *redirectLoop) Run(p *models.PageData) []models.CheckResult {
 		strings.Contains(strings.ToLower(p.Error), "stopped after") {
 		return []models.CheckResult{{
 			ID:       "crawl.redirect.loop",
-			Category: "Crawlability",
+			Category: redirectCategory,
 			Severity: models.SeverityError,
 			Message:  "Redirect loop detected",
 			URL:      p.URL,
+			Details:  p.Error,
 		}}
 	}
 	// Check for repeated URL in chain
@@ -121,7 +140,7 @@ func (r *redirectLoop) Run(p *models.PageData) []models.CheckResult {
 		if seen[hop.URL] {
 			return []models.CheckResult{{
 				ID:       "crawl.redirect.loop",
-				Category: "Crawlability",
+				Category: redirectCategory,
 				Severity: models.SeverityError,
 				Message:  "Redirect loop detected",
 				URL:      p.URL,
@@ -135,15 +154,174 @@ func (r *redirectLoop) Run(p *models.PageData) []models.CheckResult {
 type redirect302Permanent struct{}
 
 func (r *redirect302Permanent) Run(p *models.PageData) []models.CheckResult {
-	// If there is a redirect and the page URL differs from final URL, and status was 302
-	if p.StatusCode == 302 && p.URL != p.FinalURL {
+	for _, transition := range redirectTransitions(p) {
+		if isTemporaryRedirectStatus(transition.StatusCode) {
+			return []models.CheckResult{{
+				ID:       "crawl.redirect.302_permanent",
+				Category: redirectCategory,
+				Severity: models.SeverityWarning,
+				Message:  "Temporary redirect used for a likely permanent move",
+				URL:      p.URL,
+				Details:  transition.String(),
+			}}
+		}
+	}
+	if isTemporaryRedirectStatus(p.StatusCode) && p.URL != p.FinalURL {
 		return []models.CheckResult{{
 			ID:       "crawl.redirect.302_permanent",
-			Category: "Crawlability",
+			Category: redirectCategory,
 			Severity: models.SeverityWarning,
-			Message:  "Using 302 (temporary) redirect — consider 301 if permanent",
+			Message:  "Temporary redirect used for a likely permanent move",
 			URL:      p.URL,
 			Details:  fmt.Sprintf("Redirects to: %s", p.FinalURL),
+		}}
+	}
+	return nil
+}
+
+type redirectHTTPToHTTPSPermanent struct{}
+
+func (r *redirectHTTPToHTTPSPermanent) Run(p *models.PageData) []models.CheckResult {
+	start, final := parsedURL(p.URL), parsedURL(firstNonEmpty(p.FinalURL, p.URL))
+	if start == nil || start.Scheme != "http" {
+		return nil
+	}
+	if final == nil || final.Scheme != "https" {
+		return []models.CheckResult{{
+			ID:       "crawl.redirect.http_to_https_not_301",
+			Category: redirectCategory,
+			Severity: models.SeverityError,
+			Message:  "HTTP URL does not permanently redirect to HTTPS",
+			URL:      p.URL,
+			Details:  redirectChainDetails(p),
+		}}
+	}
+	for _, transition := range redirectTransitions(p) {
+		from, to := parsedURL(transition.From), parsedURL(transition.To)
+		if from == nil || to == nil || from.Scheme != "http" || to.Scheme != "https" {
+			continue
+		}
+		if !isPermanentRedirectStatus(transition.StatusCode) {
+			return []models.CheckResult{{
+				ID:       "crawl.redirect.http_to_https_not_301",
+				Category: redirectCategory,
+				Severity: models.SeverityWarning,
+				Message:  "HTTP to HTTPS redirect is not permanent",
+				URL:      p.URL,
+				Details:  transition.String(),
+			}}
+		}
+	}
+	return nil
+}
+
+type redirectWWWVariantPermanent struct{}
+
+func (r *redirectWWWVariantPermanent) Run(p *models.PageData) []models.CheckResult {
+	for _, transition := range redirectTransitions(p) {
+		from, to := parsedURL(transition.From), parsedURL(transition.To)
+		if !isWWWVariantChange(from, to) {
+			continue
+		}
+		if !isPermanentRedirectStatus(transition.StatusCode) {
+			return []models.CheckResult{{
+				ID:       "crawl.redirect.www_variant_not_301",
+				Category: redirectCategory,
+				Severity: models.SeverityWarning,
+				Message:  "WWW/non-WWW redirect is not permanent",
+				URL:      p.URL,
+				Details:  transition.String(),
+			}}
+		}
+	}
+	return nil
+}
+
+type redirectTrailingSlashPermanent struct{}
+
+func (r *redirectTrailingSlashPermanent) Run(p *models.PageData) []models.CheckResult {
+	for _, transition := range redirectTransitions(p) {
+		from, to := parsedURL(transition.From), parsedURL(transition.To)
+		if !isTrailingSlashChange(from, to) {
+			continue
+		}
+		if !isPermanentRedirectStatus(transition.StatusCode) {
+			return []models.CheckResult{{
+				ID:       "crawl.redirect.trailing_slash_inconsistent",
+				Category: redirectCategory,
+				Severity: models.SeverityWarning,
+				Message:  "Trailing slash redirect is not permanent",
+				URL:      p.URL,
+				Details:  transition.String(),
+			}}
+		}
+	}
+	return nil
+}
+
+type redirectJavascript struct{}
+
+func (r *redirectJavascript) Run(p *models.PageData) []models.CheckResult {
+	if strings.TrimSpace(p.RawHTML) == "" || !jsRedirectPattern.MatchString(p.RawHTML) {
+		return nil
+	}
+	return []models.CheckResult{{
+		ID:       "crawl.redirect.javascript",
+		Category: redirectCategory,
+		Severity: models.SeverityWarning,
+		Message:  "JavaScript-based redirect detected",
+		URL:      p.URL,
+		Details:  snippetAroundMatch(p.RawHTML, jsRedirectPattern),
+	}}
+}
+
+type redirectMetaRefresh struct{}
+
+func (r *redirectMetaRefresh) Run(p *models.PageData) []models.CheckResult {
+	if strings.TrimSpace(p.RawHTML) == "" {
+		return nil
+	}
+	match := metaRefreshPattern.FindString(p.RawHTML)
+	if match == "" {
+		return nil
+	}
+	if !strings.Contains(strings.ToLower(match), "url=") && !metaRefreshAltPattern.MatchString(match) {
+		return nil
+	}
+	return []models.CheckResult{{
+		ID:       "crawl.redirect.meta_refresh",
+		Category: redirectCategory,
+		Severity: models.SeverityWarning,
+		Message:  "Meta refresh redirect detected",
+		URL:      p.URL,
+		Details:  compactSnippet(match),
+	}}
+}
+
+type redirectDestinationIndexable struct{}
+
+func (r *redirectDestinationIndexable) Run(p *models.PageData) []models.CheckResult {
+	if !hasRedirect(p) {
+		return nil
+	}
+	if p.StatusCode != 0 && p.StatusCode != 200 {
+		return []models.CheckResult{{
+			ID:       "crawl.redirect.destination_not_indexable",
+			Category: redirectCategory,
+			Severity: models.SeverityError,
+			Message:  "Redirect destination does not return HTTP 200",
+			URL:      p.URL,
+			Details:  fmt.Sprintf("final_url=%s status=%d", p.FinalURL, p.StatusCode),
+		}}
+	}
+	if robotsHasDirective(p, "noindex") {
+		return []models.CheckResult{{
+			ID:       "crawl.redirect.destination_not_indexable",
+			Category: redirectCategory,
+			Severity: models.SeverityWarning,
+			Message:  "Redirect destination is marked noindex",
+			URL:      p.URL,
+			Details:  fmt.Sprintf("final_url=%s robots=%s x_robots=%s", p.FinalURL, p.RobotsTag, p.XRobotsTag),
 		}}
 	}
 	return nil
@@ -400,4 +578,221 @@ func (r *robotsPageBlockedButLinked) Run(pages []*models.PageData) []models.Chec
 		}
 	}
 	return results
+}
+
+type redirectTrailingSlashSiteConsistency struct{}
+
+func (r *redirectTrailingSlashSiteConsistency) Run(pages []*models.PageData) []models.CheckResult {
+	byKey := map[string][]string{}
+	for _, page := range pages {
+		if page == nil || page.StatusCode != 200 || hasRedirect(page) {
+			continue
+		}
+		u := parsedURL(firstNonEmpty(page.FinalURL, page.URL))
+		if u == nil || u.Path == "" || u.Path == "/" {
+			continue
+		}
+		key := trailingSlashKey(u)
+		if key == "" {
+			continue
+		}
+		byKey[key] = append(byKey[key], u.String())
+	}
+	for _, variants := range byKey {
+		if len(uniqueStrings(variants)) > 1 {
+			return []models.CheckResult{{
+				ID:       "crawl.redirect.trailing_slash_inconsistent",
+				Category: redirectCategory,
+				Severity: models.SeverityWarning,
+				Message:  "Trailing slash URL variants both return 200",
+				URL:      variants[0],
+				Details:  strings.Join(uniqueStrings(variants), " | "),
+			}}
+		}
+	}
+	return nil
+}
+
+type redirectTransition struct {
+	From       string
+	To         string
+	StatusCode int
+}
+
+func (t redirectTransition) String() string {
+	status := "unknown"
+	if t.StatusCode > 0 {
+		status = fmt.Sprintf("%d", t.StatusCode)
+	}
+	return fmt.Sprintf("%s --%s--> %s", t.From, status, t.To)
+}
+
+func redirectTransitions(p *models.PageData) []redirectTransition {
+	if p == nil || len(p.RedirectChain) == 0 {
+		return nil
+	}
+	var transitions []redirectTransition
+	for i, hop := range p.RedirectChain {
+		to := firstNonEmpty(p.FinalURL, p.URL)
+		if i+1 < len(p.RedirectChain) {
+			to = p.RedirectChain[i+1].URL
+		}
+		transitions = append(transitions, redirectTransition{
+			From:       hop.URL,
+			To:         to,
+			StatusCode: hop.StatusCode,
+		})
+	}
+	return transitions
+}
+
+func hasRedirect(p *models.PageData) bool {
+	if p == nil {
+		return false
+	}
+	return len(p.RedirectChain) > 0 || (p.URL != "" && p.FinalURL != "" && !sameURL(p.URL, p.FinalURL))
+}
+
+func redirectChainDetails(p *models.PageData) string {
+	transitions := redirectTransitions(p)
+	if len(transitions) == 0 {
+		return firstNonEmpty(p.FinalURL, p.URL)
+	}
+	parts := make([]string, 0, len(transitions))
+	for _, transition := range transitions {
+		parts = append(parts, transition.String())
+	}
+	return strings.Join(parts, " | ")
+}
+
+func isPermanentRedirectStatus(status int) bool {
+	return status == 301 || status == 308
+}
+
+func isTemporaryRedirectStatus(status int) bool {
+	return status == 302 || status == 303 || status == 307
+}
+
+func parsedURL(raw string) *url.URL {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return nil
+	}
+	return u
+}
+
+func isWWWVariantChange(from *url.URL, to *url.URL) bool {
+	if from == nil || to == nil {
+		return false
+	}
+	fromHost := strings.ToLower(from.Hostname())
+	toHost := strings.ToLower(to.Hostname())
+	return fromHost != toHost && stripWWW(fromHost) == stripWWW(toHost)
+}
+
+func stripWWW(host string) string {
+	return strings.TrimPrefix(strings.ToLower(host), "www.")
+}
+
+func isTrailingSlashChange(from *url.URL, to *url.URL) bool {
+	if from == nil || to == nil {
+		return false
+	}
+	if !strings.EqualFold(from.Scheme, to.Scheme) || !strings.EqualFold(from.Host, to.Host) {
+		return false
+	}
+	if from.RawQuery != to.RawQuery {
+		return false
+	}
+	fromPath := normalPath(from.Path)
+	toPath := normalPath(to.Path)
+	if fromPath == "/" || toPath == "/" || fromPath == toPath {
+		return false
+	}
+	return strings.TrimRight(fromPath, "/") == strings.TrimRight(toPath, "/")
+}
+
+func trailingSlashKey(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	path := normalPath(u.Path)
+	if path == "/" {
+		return ""
+	}
+	copyURL := *u
+	copyURL.Path = strings.TrimRight(path, "/")
+	copyURL.RawQuery = ""
+	copyURL.Fragment = ""
+	return strings.ToLower(copyURL.Scheme + "://" + copyURL.Host + copyURL.Path)
+}
+
+func normalPath(path string) string {
+	if path == "" {
+		return "/"
+	}
+	return path
+}
+
+func sameURL(a string, b string) bool {
+	parsedA, parsedB := parsedURL(a), parsedURL(b)
+	if parsedA == nil || parsedB == nil {
+		return strings.TrimRight(a, "/") == strings.TrimRight(b, "/")
+	}
+	parsedA.Fragment = ""
+	parsedB.Fragment = ""
+	return strings.TrimRight(parsedA.String(), "/") == strings.TrimRight(parsedB.String(), "/")
+}
+
+func robotsHasDirective(p *models.PageData, directive string) bool {
+	directive = strings.ToLower(directive)
+	for _, value := range p.RobotsDirectives {
+		if strings.ToLower(value) == directive {
+			return true
+		}
+	}
+	return strings.Contains(strings.ToLower(p.RobotsTag), directive) ||
+		strings.Contains(strings.ToLower(p.XRobotsTag), directive)
+}
+
+func snippetAroundMatch(raw string, pattern *regexp.Regexp) string {
+	loc := pattern.FindStringIndex(raw)
+	if len(loc) != 2 {
+		return ""
+	}
+	start := loc[0] - 60
+	if start < 0 {
+		start = 0
+	}
+	end := loc[1] + 80
+	if end > len(raw) {
+		end = len(raw)
+	}
+	return compactSnippet(raw[start:end])
+}
+
+func compactSnippet(raw string) string {
+	return strings.Join(strings.Fields(raw), " ")
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func uniqueStrings(values []string) []string {
+	seen := map[string]bool{}
+	var unique []string
+	for _, value := range values {
+		if seen[value] {
+			continue
+		}
+		seen[value] = true
+		unique = append(unique, value)
+	}
+	return unique
 }

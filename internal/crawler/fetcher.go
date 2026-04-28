@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/cars24/seo-automation/internal/models"
@@ -73,65 +74,107 @@ func NewFetcher(timeout time.Duration, ua string, maxRedirects int, maxBodyBytes
 // Fetch retrieves a URL and returns the full result including redirect chain.
 func (f *Fetcher) Fetch(ctx context.Context, rawURL string) *FetchResult {
 	var redirectChain []models.RedirectHop
+	currentURL := rawURL
+	seen := map[string]bool{rawURL: true}
+	start := time.Now()
 
 	client := &http.Client{
-		Timeout: f.client.Timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) > 0 {
-				// The previous request's response code is not directly available here,
-				// so we store 0 and note: actual status captured from redirect response.
-				redirectChain = append(redirectChain, models.RedirectHop{
-					URL:        via[len(via)-1].URL.String(),
-					StatusCode: 0,
-				})
-			}
-			if len(via) >= f.MaxRedirects {
-				return fmt.Errorf("redirect loop: stopped after %d hops", f.MaxRedirects)
-			}
-			return nil
+		Timeout:   f.client.Timeout,
+		Transport: f.client.Transport,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
 		},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return &FetchResult{URL: rawURL, Error: err.Error()}
-	}
-	req.Header.Set("User-Agent", f.UserAgent)
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	for {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, currentURL, nil)
+		if err != nil {
+			return &FetchResult{URL: rawURL, FinalURL: currentURL, ResponseTimeMs: time.Since(start).Milliseconds(), Error: err.Error(), RedirectChain: redirectChain}
+		}
+		req.Header.Set("User-Agent", f.UserAgent)
+		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+		req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 
-	start := time.Now()
-	resp, err := client.Do(req)
-	elapsed := time.Since(start).Milliseconds()
+		resp, err := client.Do(req)
+		elapsed := time.Since(start).Milliseconds()
+		if err != nil {
+			return &FetchResult{URL: rawURL, FinalURL: currentURL, ResponseTimeMs: elapsed, Error: err.Error(), RedirectChain: redirectChain}
+		}
 
-	if err != nil {
-		return &FetchResult{URL: rawURL, ResponseTimeMs: elapsed, Error: err.Error(), RedirectChain: redirectChain}
-	}
-	defer resp.Body.Close()
+		if isRedirectStatus(resp.StatusCode) {
+			location := resp.Header.Get("Location")
+			if location != "" {
+				redirectChain = append(redirectChain, models.RedirectHop{
+					URL:        resp.Request.URL.String(),
+					StatusCode: resp.StatusCode,
+				})
+				closeRedirectBody(resp.Body)
+				if len(redirectChain) > f.MaxRedirects {
+					return &FetchResult{URL: rawURL, FinalURL: currentURL, ResponseTimeMs: elapsed, Error: fmt.Sprintf("redirect loop: stopped after %d hops", f.MaxRedirects), RedirectChain: redirectChain}
+				}
+				nextURL, err := resolveRedirectLocation(resp.Request.URL, location)
+				if err != nil {
+					return &FetchResult{URL: rawURL, FinalURL: currentURL, ResponseTimeMs: elapsed, Error: err.Error(), RedirectChain: redirectChain}
+				}
+				if seen[nextURL] {
+					return &FetchResult{URL: rawURL, FinalURL: nextURL, ResponseTimeMs: elapsed, Error: "redirect loop: repeated URL " + nextURL, RedirectChain: redirectChain}
+				}
+				seen[nextURL] = true
+				currentURL = nextURL
+				continue
+			}
+		}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, f.MaxBodyBytes))
-	if err != nil {
+		defer resp.Body.Close()
+		body, err := io.ReadAll(io.LimitReader(resp.Body, f.MaxBodyBytes))
+		if err != nil {
+			return &FetchResult{
+				URL:            rawURL,
+				FinalURL:       resp.Request.URL.String(),
+				StatusCode:     resp.StatusCode,
+				Headers:        resp.Header,
+				ResponseTimeMs: elapsed,
+				RedirectChain:  redirectChain,
+				Error:          err.Error(),
+			}
+		}
+
 		return &FetchResult{
 			URL:            rawURL,
 			FinalURL:       resp.Request.URL.String(),
 			StatusCode:     resp.StatusCode,
 			Headers:        resp.Header,
+			Body:           body,
 			ResponseTimeMs: elapsed,
 			RedirectChain:  redirectChain,
-			Error:          err.Error(),
+			TLSInfo:        extractTLSInfo(resp.TLS),
 		}
 	}
+}
 
-	return &FetchResult{
-		URL:            rawURL,
-		FinalURL:       resp.Request.URL.String(),
-		StatusCode:     resp.StatusCode,
-		Headers:        resp.Header,
-		Body:           body,
-		ResponseTimeMs: elapsed,
-		RedirectChain:  redirectChain,
-		TLSInfo:        extractTLSInfo(resp.TLS),
+func isRedirectStatus(status int) bool {
+	switch status {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		return true
+	default:
+		return false
 	}
+}
+
+func closeRedirectBody(body io.ReadCloser) {
+	if body == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(body, 1024))
+	_ = body.Close()
+}
+
+func resolveRedirectLocation(base *url.URL, location string) (string, error) {
+	next, err := url.Parse(location)
+	if err != nil {
+		return "", err
+	}
+	return base.ResolveReference(next).String(), nil
 }
 
 // extractTLSInfo converts a tls.ConnectionState into our TLSInfo model.
