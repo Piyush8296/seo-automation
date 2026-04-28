@@ -267,4 +267,4 @@ score = 100 − ((errors × 10 + warnings × 3 + notices × 1) × 100 / totalChe
 
 - Go 1.22+
 - Node.js 18+ (for frontend build)
-- Internet access from the machine running the audit
+- Internet access from the local machine running the audit
