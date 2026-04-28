@@ -1,0 +1,210 @@
+package integrations
+
+func providerDescriptors(checks []CheckCapability) []ProviderDescriptor {
+	checkIDsByProvider := map[string][]string{}
+	for _, check := range checks {
+		for _, providerID := range check.ProviderIDs {
+			checkIDsByProvider[providerID] = append(checkIDsByProvider[providerID], check.ID)
+		}
+	}
+
+	return []ProviderDescriptor{
+		{
+			ID:          ProviderGSC,
+			Name:        "Google Search Console",
+			FeatureFlag: "integrations.gsc.enabled",
+			CostModel:   "Free official API, quota-gated",
+			AuthModel:   "OAuth 2.0 or service account with verified property access",
+			DocsURL:     "https://developers.google.com/webmaster-tools/about",
+			Inputs: []RequiredInput{
+				input("gsc.oauth_connection", "GSC OAuth connection", "Read access to the Search Console property.", InputSourceOAuth, true, true),
+				input("gsc.property_url", "GSC property URL", "URL-prefix property with trailing slash or domain property.", InputSourceUI, true, false, "sc-domain:cars24.com"),
+				input("gsc.date_range", "GSC date range", "Reporting window for search analytics and trend comparisons.", InputSourceUI, true, false, "last_28_days"),
+				input("gsc.country", "GSC country filter", "Optional country filter for query visibility and brand trends.", InputSourceUI, false, false, "ind"),
+				input("gsc.device", "GSC device filter", "Optional device filter for mobile/desktop comparisons.", InputSourceUI, false, false, "mobile"),
+			},
+			CheckIDs: checkIDsByProvider[ProviderGSC],
+		},
+		{
+			ID:          ProviderGA4,
+			Name:        "Google Analytics 4",
+			FeatureFlag: "integrations.ga4.enabled",
+			CostModel:   "Free official API, quota-gated",
+			AuthModel:   "OAuth 2.0 or service account with GA4 property access",
+			DocsURL:     "https://developers.google.com/analytics/devguides/reporting/data/v1",
+			Inputs: []RequiredInput{
+				input("ga4.oauth_connection", "GA4 OAuth connection", "Read/Admin access to the GA4 property.", InputSourceOAuth, true, true),
+				input("ga4.property_id", "GA4 property ID", "Numeric property ID used by Data and Admin API calls.", InputSourceUI, true, false, "123456789"),
+				input("ga4.web_stream_id", "GA4 web stream ID", "Web stream used for enhanced measurement and tag checks.", InputSourceUI, false, false),
+				input("ga4.expected_key_events", "Expected key events", "Business events that must be marked or reporting as conversions.", InputSourceUI, true, false, "generate_lead"),
+				input("ga4.expected_utm_rules", "Expected UTM rules", "Allowed campaign/source/medium naming conventions.", InputSourceUI, false, false, "utm_medium in cpc,email,social"),
+				input("ga4.date_range", "GA4 date range", "Reporting window for event and conversion verification.", InputSourceUI, true, false, "last_28_days"),
+			},
+			CheckIDs: checkIDsByProvider[ProviderGA4],
+		},
+		{
+			ID:          ProviderBing,
+			Name:        "Bing Webmaster Tools",
+			FeatureFlag: "integrations.bing_webmaster.enabled",
+			CostModel:   "Free official API, quota-gated",
+			AuthModel:   "OAuth 2.0 or Bing Webmaster API key",
+			DocsURL:     "https://learn.microsoft.com/en-us/bingwebmaster/getting-access",
+			Inputs: []RequiredInput{
+				input("bing.oauth_connection", "Bing OAuth connection", "OAuth consent for a verified Bing Webmaster account.", InputSourceOAuth, true, true),
+				input("bing.site_url", "Verified Bing site URL", "Site already added and verified in Bing Webmaster Tools.", InputSourceUI, true, false, "https://www.cars24.com/"),
+				input("bing.sitemap_urls", "Submitted sitemap URLs", "Expected sitemap URLs to verify against Bing.", InputSourceUI, true, false, "https://www.cars24.com/sitemap.xml"),
+			},
+			CheckIDs: checkIDsByProvider[ProviderBing],
+		},
+		{
+			ID:          ProviderGBP,
+			Name:        "Google Business Profile",
+			FeatureFlag: "integrations.google_business_profile.enabled",
+			CostModel:   "Free official API for registered users, quota-gated",
+			AuthModel:   "OAuth 2.0 with business.manage scope",
+			DocsURL:     "https://developers.google.com/my-business/content/overview",
+			Inputs: []RequiredInput{
+				input("gbp.oauth_connection", "GBP OAuth connection", "Business Profile OAuth consent for managed accounts and locations.", InputSourceOAuth, true, true),
+				input("gbp.account_ids", "GBP account IDs", "Accounts that own or manage the brand locations.", InputSourceProviderProject, true, false, "accounts/123"),
+				input("gbp.location_ids", "GBP location IDs", "Location IDs mapped to city or branch records.", InputSourceProviderProject, true, false, "locations/456"),
+				input("gbp.nap_baseline", "NAP baseline", "Expected name, address, and phone data for consistency checks.", InputSourceUI, true, false),
+				input("gbp.required_categories", "Required categories", "Expected primary and secondary GBP categories.", InputSourceUI, false, false, "Used car dealer"),
+				input("gbp.posts_cadence_days", "Post cadence", "Maximum days allowed since last GBP post.", InputSourceUI, false, false, "14"),
+			},
+			CheckIDs: checkIDsByProvider[ProviderGBP],
+		},
+		{
+			ID:          ProviderSEOVendor,
+			Name:        "SEO vendor API",
+			FeatureFlag: "integrations.seo_vendor.enabled",
+			CostModel:   "Paid subscription and/or API units",
+			AuthModel:   "Vendor API key or OAuth; v1 recommendation is one vendor, not both Ahrefs and Semrush",
+			DocsURL:     "https://developer.semrush.com/api/get-started/api-access/",
+			Inputs: []RequiredInput{
+				input("seo_vendor.vendor", "SEO vendor", "Selected vendor for keyword, backlink, competitor, and local intelligence.", InputSourceUI, true, false, "semrush"),
+				input("seo_vendor.api_key", "SEO vendor API key", "Secret credential stored outside the public settings payload.", InputSourceSecretStore, true, true),
+				input("seo_vendor.project_id", "Vendor project/campaign ID", "Optional project ID for position tracking or local campaigns.", InputSourceProviderProject, false, false),
+				input("site.target_keywords", "Target keywords", "Seed and tracked keyword list.", InputSourceUI, true, false),
+				input("site.competitor_domains", "Competitor domains", "Competitors used for gaps, backlink intersections, and benchmarks.", InputSourceUI, true, false),
+				input("site.locations", "Markets and locations", "Country/city/device locations for keyword and local rank checks.", InputSourceUI, false, false),
+			},
+			CheckIDs: checkIDsByProvider[ProviderSEOVendor],
+		},
+		{
+			ID:          ProviderSERP,
+			Name:        "SERP provider",
+			FeatureFlag: "integrations.serp_provider.enabled",
+			CostModel:   "Paid per request or subscription",
+			AuthModel:   "Provider API key",
+			DocsURL:     "https://docs.dataforseo.com/v3/serp/overview/",
+			Inputs: []RequiredInput{
+				input("serp_provider.api_key", "SERP provider API key", "Secret credential for rank, local pack, and SERP feature data.", InputSourceSecretStore, true, true),
+				input("site.target_keywords", "Target keywords", "Keywords to query in SERP data.", InputSourceUI, true, false),
+				input("site.country", "Country", "Search country or search database.", InputSourceUI, true, false),
+				input("serp_provider.location", "SERP location", "City/geo location for localized results.", InputSourceUI, false, false, "Delhi,India"),
+				input("serp_provider.device", "Device", "Desktop or mobile SERP surface.", InputSourceUI, false, false, "mobile"),
+			},
+			CheckIDs: checkIDsByProvider[ProviderSERP],
+		},
+		{
+			ID:          ProviderPlagiarism,
+			Name:        "Plagiarism or duplicate-content vendor",
+			FeatureFlag: "integrations.plagiarism_vendor.enabled",
+			CostModel:   "Usually paid per request or subscription",
+			AuthModel:   "Vendor API key",
+			Inputs: []RequiredInput{
+				input("plagiarism_vendor.api_key", "Plagiarism vendor API key", "Secret credential for external duplicate checks.", InputSourceSecretStore, true, true),
+				input("content.source", "Content source", "CMS export, manually supplied text, or URL text fetched by a worker.", InputSourceUI, true, false),
+				input("plagiarism_vendor.match_threshold", "Match threshold", "Similarity threshold to classify copied/scraped content.", InputSourceUI, false, false, "0.85"),
+			},
+			CheckIDs: checkIDsByProvider[ProviderPlagiarism],
+		},
+		{
+			ID:          ProviderNews,
+			Name:        "News and mention monitor",
+			FeatureFlag: "integrations.news_monitor.enabled",
+			CostModel:   "Usually paid subscription or API credits",
+			AuthModel:   "Vendor API key",
+			Inputs: []RequiredInput{
+				input("news_monitor.api_key", "News monitor API key", "Secret credential for news and brand mention data.", InputSourceSecretStore, true, true),
+				input("site.brand_name", "Brand terms", "Brand names and aliases to monitor.", InputSourceUI, true, false),
+			},
+			CheckIDs: checkIDsByProvider[ProviderNews],
+		},
+		{
+			ID:          ProviderSocial,
+			Name:        "Social platform APIs",
+			FeatureFlag: "integrations.social_platforms.enabled",
+			CostModel:   "Mixed: official APIs, partner access, or paid aggregation",
+			AuthModel:   "Platform OAuth/app credentials or vendor API",
+			Inputs: []RequiredInput{
+				input("social.official_handles", "Official social handles", "Expected social profiles for the brand.", InputSourceUI, true, false),
+				input("social.api_access", "Social API access", "OAuth/app access or aggregator credential.", InputSourceSecretStore, false, true),
+			},
+			CheckIDs: checkIDsByProvider[ProviderSocial],
+		},
+		{
+			ID:          ProviderReviews,
+			Name:        "Review vendor",
+			FeatureFlag: "integrations.review_vendor.enabled",
+			CostModel:   "Usually paid subscription",
+			AuthModel:   "Vendor API key or OAuth",
+			Inputs: []RequiredInput{
+				input("review_vendor.api_key", "Review vendor API key", "Secret credential for third-party review platforms.", InputSourceSecretStore, true, true),
+				input("review_vendor.platform_ids", "Review platform IDs", "Brand or branch identifiers on review platforms.", InputSourceUI, true, false),
+			},
+			CheckIDs: checkIDsByProvider[ProviderReviews],
+		},
+		{
+			ID:          ProviderListings,
+			Name:        "Listings vendor",
+			FeatureFlag: "integrations.listings_vendor.enabled",
+			CostModel:   "Usually paid subscription",
+			AuthModel:   "Vendor API key",
+			Inputs: []RequiredInput{
+				input("listings_vendor.api_key", "Listings vendor API key", "Secret credential for citation and NAP distribution checks.", InputSourceSecretStore, true, true),
+				input("gbp.nap_baseline", "NAP baseline", "Expected branch-level NAP records.", InputSourceUI, true, false),
+			},
+			CheckIDs: checkIDsByProvider[ProviderListings],
+		},
+		{
+			ID:          ProviderRUM,
+			Name:        "Real-user monitoring vendor",
+			FeatureFlag: "integrations.rum_vendor.enabled",
+			CostModel:   "Usually paid subscription; may also use internal analytics",
+			AuthModel:   "Vendor API key or warehouse connection",
+			Inputs: []RequiredInput{
+				input("rum_vendor.api_key", "RUM vendor API key", "Secret credential for speed trend data.", InputSourceSecretStore, true, true),
+				input("rum_vendor.project_id", "RUM project ID", "Project or app ID for speed monitoring data.", InputSourceProviderProject, true, false),
+			},
+			CheckIDs: checkIDsByProvider[ProviderRUM],
+		},
+		{
+			ID:          ProviderManual,
+			Name:        "Manual workflow",
+			FeatureFlag: "manual_workflow.enabled",
+			CostModel:   "No API cost; internal process cost",
+			AuthModel:   "Reviewer attestation in the platform",
+			Inputs: []RequiredInput{
+				input("manual.owner", "Workflow owner", "Person or team responsible for attestation.", InputSourceUI, true, false),
+				input("manual.evidence_url", "Evidence URL", "Link to proof, screenshot, doc, ticket, or policy.", InputSourceManual, true, false),
+			},
+			CheckIDs: checkIDsByProvider[ProviderManual],
+		},
+		{
+			ID:          ProviderAI,
+			Name:        "AI content evaluator",
+			FeatureFlag: "ai_content_evaluator.enabled",
+			CostModel:   "Paid model/API tokens plus internal review",
+			AuthModel:   "Model provider key or internal model gateway",
+			Inputs: []RequiredInput{
+				input("ai.model", "AI model", "Approved model or internal AI gateway to use.", InputSourceUI, true, false),
+				input("ai.api_key", "AI API key", "Secret credential if not using an internal gateway.", InputSourceSecretStore, false, true),
+				input("content.source", "Content source", "CMS text, fetched page text, or uploaded content to evaluate.", InputSourceUI, true, false),
+				input("site.target_keywords", "Target keywords", "Keywords and search intent to evaluate against.", InputSourceUI, false, false),
+				input("site.competitor_domains", "Competitor domains", "Competitor pages used for comprehensiveness benchmarking.", InputSourceUI, false, false),
+			},
+			CheckIDs: checkIDsByProvider[ProviderAI],
+		},
+	}
+}

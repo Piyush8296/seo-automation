@@ -42,7 +42,7 @@ func NewManager(storage *Storage, hub *Hub) *Manager {
 		storage:  storage,
 		hub:      hub,
 		cancels:  make(map[string]context.CancelFunc),
-		settings: AppSettings{SkipLinkHosts: DefaultSkipLinkHosts},
+		settings: DefaultAppSettings(),
 	}
 }
 
@@ -50,16 +50,14 @@ func NewManager(storage *Storage, hub *Hub) *Manager {
 func (m *Manager) GetSettings() AppSettings {
 	m.settingsMu.RLock()
 	defer m.settingsMu.RUnlock()
-	cp := m.settings
-	cp.SkipLinkHosts = append([]string(nil), m.settings.SkipLinkHosts...)
-	return cp
+	return m.settings.Normalize()
 }
 
 // UpdateSettings replaces the current settings atomically.
 func (m *Manager) UpdateSettings(cfg AppSettings) {
 	m.settingsMu.Lock()
 	defer m.settingsMu.Unlock()
-	m.settings = cfg
+	m.settings = cfg.Normalize()
 }
 
 // StartAudit validates the request, persists an initial record, and launches the

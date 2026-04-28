@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Globe2, Settings as SettingsIcon, CheckSquare, Database, X, Plus, RotateCcw } from 'lucide-react'
+import { Globe2, Settings as SettingsIcon, CheckSquare, Database, X, Plus, RotateCcw, KeyRound, Flag, MapPinned, Search } from 'lucide-react'
 import { api } from '../lib/api'
 
 const DEFAULT_HOSTS = [
@@ -14,7 +14,9 @@ const DEFAULT_HOSTS = [
 
 export default function Settings() {
   const navigate = useNavigate()
+  const [settings, setSettings] = useState(null)
   const [hosts, setHosts] = useState([])
+  const [externalCatalog, setExternalCatalog] = useState(null)
   const [input, setInput] = useState('')
   const [inputError, setInputError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -23,8 +25,14 @@ export default function Settings() {
 
   useEffect(() => {
     api.getSettings()
-      .then((s) => setHosts(s?.skip_link_hosts ?? DEFAULT_HOSTS))
+      .then((s) => {
+        setSettings(s)
+        setHosts(s?.skip_link_hosts ?? DEFAULT_HOSTS)
+      })
       .catch(() => setHosts(DEFAULT_HOSTS))
+    api.getExternalCheckCatalog()
+      .then(setExternalCatalog)
+      .catch(() => setExternalCatalog(null))
   }, [])
 
   const addHost = () => {
@@ -49,7 +57,9 @@ export default function Settings() {
     setSaving(true)
     setSaved(false)
     try {
-      await api.updateSettings({ skip_link_hosts: hosts })
+      const nextSettings = { ...(settings ?? {}), skip_link_hosts: hosts }
+      const savedSettings = await api.updateSettings(nextSettings)
+      setSettings(savedSettings)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } finally {
@@ -105,6 +115,20 @@ export default function Settings() {
             >
               <CheckSquare size={15} />
               <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Checks Catalog</span>
+            </button>
+            <button
+              onClick={() => navigate('/local-seo')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <MapPinned size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Local SEO</span>
+            </button>
+            <button
+              onClick={() => navigate('/search-integrations')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <Search size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>GSC + Bing</span>
             </button>
           </nav>
         </div>
@@ -206,6 +230,92 @@ export default function Settings() {
                   Reset to defaults
                 </button>
               </div>
+            </div>
+
+            {/* External API readiness section */}
+            <div className="rounded-xl p-6 flex flex-col gap-5" style={{ background: '#161c26' }}>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <KeyRound size={14} style={{ color: '#3fe56c' }} />
+                  <h2 className="text-on-surface font-semibold text-sm">External API Check Packs</h2>
+                </div>
+                <p className="text-on-surface-variant" style={{ fontSize: '12px' }}>
+                  These non-Screaming-Frog checks run only after the relevant provider flag,
+                  property IDs, OAuth/API credentials, and UI inputs are configured. Secrets should live in a
+                  secret store or environment variables, not in this settings payload.
+                </p>
+              </div>
+
+              {externalCatalog ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-lg p-4" style={{ background: '#1a202a', border: '1px solid rgba(60,74,60,0.35)' }}>
+                      <p className="uppercase tracking-widest text-on-surface-variant" style={{ fontSize: '9px' }}>Mapped Checks</p>
+                      <p className="text-on-surface font-display font-semibold mt-1" style={{ fontSize: '24px' }}>
+                        {externalCatalog.total_checks ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg p-4" style={{ background: '#1a202a', border: '1px solid rgba(60,74,60,0.35)' }}>
+                      <p className="uppercase tracking-widest text-on-surface-variant" style={{ fontSize: '9px' }}>Providers</p>
+                      <p className="text-on-surface font-display font-semibold mt-1" style={{ fontSize: '24px' }}>
+                        {externalCatalog.providers?.length ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg p-4" style={{ background: '#1a202a', border: '1px solid rgba(60,74,60,0.35)' }}>
+                      <p className="uppercase tracking-widest text-on-surface-variant" style={{ fontSize: '9px' }}>Feature Flags</p>
+                      <p className="text-on-surface font-display font-semibold mt-1" style={{ fontSize: '24px' }}>
+                        {externalCatalog.feature_flags?.length ?? 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    {externalCatalog.providers?.map((provider) => (
+                      <div
+                        key={provider.id}
+                        className="rounded-lg p-4"
+                        style={{ background: '#1a202a', border: '1px solid rgba(60,74,60,0.35)' }}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                          <div>
+                            <h3 className="text-on-surface font-semibold text-sm">{provider.name}</h3>
+                            <p className="text-on-surface-variant mt-1" style={{ fontSize: '11px' }}>
+                              {provider.cost_model}
+                            </p>
+                          </div>
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono"
+                            style={{ background: 'rgba(63,229,108,0.08)', color: '#3fe56c', fontSize: '10px' }}
+                          >
+                            <Flag size={10} />
+                            {provider.feature_flag}
+                          </span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="text-on-surface-variant" style={{ fontSize: '11px' }}>
+                            {provider.check_ids?.length ?? 0} checks
+                          </span>
+                          <span className="text-on-surface-variant" style={{ fontSize: '11px' }}>•</span>
+                          <span className="text-on-surface-variant" style={{ fontSize: '11px' }}>
+                            {provider.inputs?.filter((inputItem) => inputItem.source === 'ui').length ?? 0} UI inputs
+                          </span>
+                          <span className="text-on-surface-variant" style={{ fontSize: '11px' }}>•</span>
+                          <span className="text-on-surface-variant" style={{ fontSize: '11px' }}>
+                            {provider.inputs?.filter((inputItem) => inputItem.secret).length ?? 0} secret inputs
+                          </span>
+                        </div>
+                        <p className="text-on-surface-variant mt-2" style={{ fontSize: '11px' }}>
+                          Auth: {provider.auth_model}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-on-surface-variant italic" style={{ fontSize: '12px' }}>
+                  External check catalog could not be loaded.
+                </p>
+              )}
             </div>
 
           </div>

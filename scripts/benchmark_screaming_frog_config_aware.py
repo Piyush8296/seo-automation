@@ -29,93 +29,67 @@ TITLE_FONT = Font(size=14, bold=True)
 WRAP = Alignment(vertical="top", wrap_text=True)
 
 
-SF_CONFIG_ROWS = [
-    (
-        "Seed URL",
-        "https://www.cars24.com/buy-used-cars/",
-        "User-provided benchmark target.",
-    ),
-    (
-        "Limit Crawl Total",
-        "5000",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Limit Crawl Depth",
-        "5",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Limit Crawl Total Per Subdomain",
-        "Disabled",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Limit URLs Per Crawl Depth",
-        "Disabled",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Limit Max Folder Depth",
-        "Disabled",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Limit Number of Query Strings",
-        "Disabled",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Max Redirects to Follow",
-        "5",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Max URL Length to Crawl",
-        "10000",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Max Links per URL to Crawl",
-        "10000",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Max Page Size (KB) to Crawl",
-        "50000",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Limit by URL Path",
-        "None configured",
-        "Visible in Screaming Frog screenshot.",
-    ),
-    (
-        "Crawl Scope",
-        "Host crawl from seed URL (inferred)",
-        "No URL path limits were configured in the provided screenshot.",
-    ),
-    (
-        "Sitemap Settings",
-        "Not provided",
-        "Not visible in the screenshot or combined export metadata.",
-    ),
-    (
-        "Respect robots.txt",
-        "Not provided",
-        "Not visible in the screenshot or combined export metadata.",
-    ),
-    (
-        "User-Agent",
-        "Not provided",
-        "Not visible in the screenshot or combined export metadata.",
-    ),
-    (
-        "Rendering Mode",
-        "Not provided",
-        "Not visible in the screenshot or combined export metadata.",
-    ),
+CONFIG_SETTINGS = [
+    "Seed URL",
+    "Limit Crawl Total",
+    "Limit Crawl Depth",
+    "Limit Crawl Total Per Subdomain",
+    "Limit URLs Per Crawl Depth",
+    "Limit Max Folder Depth",
+    "Limit Number of Query Strings",
+    "Max Redirects to Follow",
+    "Max URL Length to Crawl",
+    "Max Links per URL to Crawl",
+    "Max Page Size (KB) to Crawl",
+    "Limit by URL Path",
+    "Crawl Scope",
+    "Sitemap Settings",
+    "Respect robots.txt",
+    "User-Agent",
+    "Rendering Mode",
 ]
+
+
+def build_sf_config_rows(target_url: str, sf_config_mode: str) -> list[tuple[str, str, str]]:
+    if sf_config_mode == "buy-known-limits":
+        return [
+            ("Seed URL", target_url, "User-provided benchmark target."),
+            ("Limit Crawl Total", "5000", "Visible in Screaming Frog screenshot."),
+            ("Limit Crawl Depth", "5", "Visible in Screaming Frog screenshot."),
+            ("Limit Crawl Total Per Subdomain", "Disabled", "Visible in Screaming Frog screenshot."),
+            ("Limit URLs Per Crawl Depth", "Disabled", "Visible in Screaming Frog screenshot."),
+            ("Limit Max Folder Depth", "Disabled", "Visible in Screaming Frog screenshot."),
+            ("Limit Number of Query Strings", "Disabled", "Visible in Screaming Frog screenshot."),
+            ("Max Redirects to Follow", "5", "Visible in Screaming Frog screenshot."),
+            ("Max URL Length to Crawl", "10000", "Visible in Screaming Frog screenshot."),
+            ("Max Links per URL to Crawl", "10000", "Visible in Screaming Frog screenshot."),
+            ("Max Page Size (KB) to Crawl", "50000", "Visible in Screaming Frog screenshot."),
+            ("Limit by URL Path", "None configured", "Visible in Screaming Frog screenshot."),
+            ("Crawl Scope", "Host crawl from seed URL (inferred)", "No URL path limits were configured in the provided screenshot."),
+            ("Sitemap Settings", "Not provided", "Not visible in the screenshot or combined export metadata."),
+            ("Respect robots.txt", "Not provided", "Not visible in the screenshot or combined export metadata."),
+            ("User-Agent", "Not provided", "Not visible in the screenshot or combined export metadata."),
+            ("Rendering Mode", "Not provided", "Not visible in the screenshot or combined export metadata."),
+        ]
+    return [
+        ("Seed URL", target_url, "User-provided benchmark target."),
+        ("Limit Crawl Total", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Limit Crawl Depth", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Limit Crawl Total Per Subdomain", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Limit URLs Per Crawl Depth", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Limit Max Folder Depth", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Limit Number of Query Strings", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Max Redirects to Follow", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Max URL Length to Crawl", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Max Links per URL to Crawl", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Max Page Size (KB) to Crawl", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Limit by URL Path", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Crawl Scope", "Not provided", "Only the export was provided, so crawl scope is not asserted."),
+        ("Sitemap Settings", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Respect robots.txt", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("User-Agent", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+        ("Rendering Mode", "Not provided", "No Screaming Frog crawl-limit screenshot was provided."),
+    ]
 
 
 @dataclass(frozen=True)
@@ -482,6 +456,7 @@ def build_rows(combined_dir: Path, audit: dict) -> tuple[list[dict], list[dict]]
 def markdown_report(
     combined_dir: Path,
     report_json: Path,
+    target_url: str,
     audit: dict,
     config_rows: list[dict],
     validity_rows: list[tuple[str, str]],
@@ -493,7 +468,7 @@ def markdown_report(
     lines.append("")
     lines.append(f"- Screaming Frog export: `{combined_dir}`")
     lines.append(f"- Our crawl report: `{report_json}`")
-    lines.append(f"- Benchmark target: `https://www.cars24.com/buy-used-cars/`")
+    lines.append(f"- Benchmark target: `{target_url}`")
     lines.append("")
     lines.append("## Overall Verdict")
     lines.append("")
@@ -566,6 +541,7 @@ def write_workbook(
     output_path: Path,
     combined_dir: Path,
     report_json: Path,
+    target_url: str,
     config_rows: list[dict],
     validity_rows: list[tuple[str, str]],
     detail_rows: list[dict],
@@ -584,7 +560,7 @@ def write_workbook(
     summary_rows = [
         ("Screaming Frog export", str(combined_dir)),
         ("Our crawl report", str(report_json)),
-        ("Benchmark target", "https://www.cars24.com/buy-used-cars/"),
+        ("Benchmark target", target_url),
         ("Verdict", dict(validity_rows).get("Verdict", "Not Comparable")),
         ("SF internal_all rows", dict(validity_rows).get("SF internal_all rows", "")),
         ("Our pages crawled", dict(validity_rows).get("Our pages crawled", "")),
@@ -686,14 +662,22 @@ def main() -> int:
     parser.add_argument("--report-json", required=True, type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--excel-output", type=Path, required=True)
+    parser.add_argument("--target-url", type=str, default="https://www.cars24.com/buy-used-cars/")
+    parser.add_argument(
+        "--sf-config-mode",
+        choices=("buy-known-limits", "unknown"),
+        default="buy-known-limits",
+        help="How much Screaming Frog crawl-configuration evidence is available.",
+    )
     args = parser.parse_args()
 
     audit = load_json(args.report_json)
     counts = report_index_counts(args.combined_dir / "report_index.csv")
     validity_verdict, validity_rows = benchmark_validity(audit, counts.get("internal_all.csv", 0))
 
+    sf_config_rows = build_sf_config_rows(args.target_url, args.sf_config_mode)
     config_rows = []
-    for setting, sf_value, base_note in SF_CONFIG_ROWS:
+    for setting, sf_value, base_note in sf_config_rows:
         our_value, our_note = our_config_value(audit, setting)
         parity, parity_note = config_parity(sf_value, our_value, setting)
         notes = " | ".join(note for note in (base_note, our_note, parity_note) if note)
@@ -712,6 +696,7 @@ def main() -> int:
     markdown = markdown_report(
         combined_dir=args.combined_dir,
         report_json=args.report_json,
+        target_url=args.target_url,
         audit=audit,
         config_rows=config_rows,
         validity_rows=validity_rows,
@@ -725,6 +710,7 @@ def main() -> int:
         output_path=args.excel_output,
         combined_dir=args.combined_dir,
         report_json=args.report_json,
+        target_url=args.target_url,
         config_rows=config_rows,
         validity_rows=validity_rows,
         detail_rows=detail_rows,

@@ -43,6 +43,9 @@ tmp/
 
 # Claude Code (local agent state, worktrees, launch config)
 .claude/
+outputs/
+scripts/
+node_modules
 
 # Internal planning docs (local-only)
 FEATURE_ROADMAP.md

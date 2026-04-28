@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cars24/seo-automation/internal/checks"
+	"github.com/cars24/seo-automation/internal/integrations"
 )
 
 // Handlers holds references to all service-layer dependencies.
@@ -183,6 +184,12 @@ func (h *Handlers) listChecks(w http.ResponseWriter, r *http.Request) {
 		"check_ids":   cat.CheckIDs,
 		"checks":      checks.GetCheckDescriptors(),
 	})
+}
+
+// ── GET /api/external-checks/catalog ─────────────────────────────────────────
+
+func (h *Handlers) listExternalCheckCatalog(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, integrations.GetCatalog())
 }
 
 // ── GET /api/audits/diff?a={id}&b={id} ───────────────────────────────────────

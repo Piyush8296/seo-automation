@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Globe2, Settings, CheckSquare, ArrowLeft, Database,
-  Play, ExternalLink, Trash2, RefreshCw, Search, AlertCircle,
+  Play, ExternalLink, Trash2, RefreshCw, Search, AlertCircle, MapPinned,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import StatusBadge from '../components/StatusBadge'
@@ -211,6 +211,20 @@ export default function AuditVault() {
             >
               <CheckSquare size={15} />
               <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Checks Catalog</span>
+            </button>
+            <button
+              onClick={() => navigate('/local-seo')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <MapPinned size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Local SEO</span>
+            </button>
+            <button
+              onClick={() => navigate('/search-integrations')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <Search size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>GSC + Bing</span>
             </button>
           </nav>
         </div>

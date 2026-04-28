@@ -34,6 +34,36 @@ export const api = {
   getCheckCatalog: () =>
     fetch(`${BASE}/checks`).then(handleResponse),
 
+  getExternalCheckCatalog: () =>
+    fetch(`${BASE}/external-checks/catalog`).then(handleResponse),
+
+  getLocalSEO: () =>
+    fetch(`${BASE}/local-seo/gbp`).then(handleResponse),
+
+  submitGBPAction: (req) =>
+    fetch(`${BASE}/local-seo/gbp/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    }).then(handleResponse),
+
+  getSearchIntegrations: () =>
+    fetch(`${BASE}/search-integrations`).then(handleResponse),
+
+  connectSearchOAuth: (req) =>
+    fetch(`${BASE}/search-integrations/oauth/connect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    }).then(handleResponse),
+
+  submitSearchIntegrationAction: (req) =>
+    fetch(`${BASE}/search-integrations/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    }).then(handleResponse),
+
   getSettings: () =>
     fetch(`${BASE}/settings`).then(handleResponse),
 

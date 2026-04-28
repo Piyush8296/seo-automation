@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Settings, Globe2, ChevronDown, ChevronUp, CheckSquare, Database, Info } from 'lucide-react'
+import { Play, Settings, Globe2, ChevronDown, ChevronUp, CheckSquare, Database, Info, MapPinned, Search } from 'lucide-react'
 import { api } from '../lib/api'
 
 const DEFAULTS = {
@@ -180,6 +180,20 @@ export default function Home() {
                   {checkCount}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => navigate('/local-seo')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <MapPinned size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>Local SEO</span>
+            </button>
+            <button
+              onClick={() => navigate('/search-integrations')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors"
+            >
+              <Search size={15} />
+              <span className="uppercase tracking-widest" style={{ fontSize: '9px' }}>GSC + Bing</span>
             </button>
           </nav>
         </div>

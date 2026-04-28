@@ -65,6 +65,60 @@ func (s *Server) Handler() http.Handler {
 		s.h.listChecks(w, r)
 	})
 
+	// External check catalog (read-only introspection for integration-backed checks)
+	mux.HandleFunc("/api/external-checks/catalog", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.listExternalCheckCatalog(w, r)
+	})
+
+	// Local SEO / Google Business Profile workspace.
+	mux.HandleFunc("/api/local-seo/gbp", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.getLocalSEO(w, r)
+	})
+
+	// Placeholder write endpoint for future GBP update/post operations.
+	mux.HandleFunc("/api/local-seo/gbp/actions", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.submitGBPAction(w, r)
+	})
+
+	// Search integrations workspace for GSC and Bing Webmaster.
+	mux.HandleFunc("/api/search-integrations", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.getSearchIntegrations(w, r)
+	})
+
+	// Placeholder OAuth connect endpoint for GSC and Bing.
+	mux.HandleFunc("/api/search-integrations/oauth/connect", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.connectSearchOAuth(w, r)
+	})
+
+	// Placeholder POST operations for GSC URL inspection and sitemap submission.
+	mux.HandleFunc("/api/search-integrations/actions", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.submitSearchIntegrationAction(w, r)
+	})
+
 	// Root collection: list + create
 	mux.HandleFunc("/api/audits", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -160,7 +214,7 @@ func (s *Server) ListenAndServe(addr string) error {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
