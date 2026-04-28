@@ -20,11 +20,21 @@ var checklistIDMap = map[string][]string{
 	"amp.regular.missing_amphtml":  {"MOBILE-011"},
 
 	// Canonical
-	"canonical.conflict_og_url":  {"HTML-004"},
-	"canonical.insecure":         {"CANONICAL-013"},
-	"canonical.missing":          {"CANONICAL-001"},
-	"canonical.not_absolute":     {"CANONICAL-006"},
-	"canonical.points_elsewhere": {"CANONICAL-002", "CANONICAL-003"},
+	"canonical.chain":                   {"CANONICAL-011"},
+	"canonical.conflict_og_url":         {"HTML-004"},
+	"canonical.country_folder_mismatch": {"CANONICAL-022"},
+	"canonical.has_fragment":            {"CANONICAL-021"},
+	"canonical.header_mismatch":         {"CANONICAL-009"},
+	"canonical.insecure":                {"CANONICAL-013"},
+	"canonical.in_body":                 {"CANONICAL-020"},
+	"canonical.loop":                    {"CANONICAL-010"},
+	"canonical.missing":                 {"CANONICAL-001"},
+	"canonical.multiple":                {"CANONICAL-007"},
+	"canonical.not_absolute":            {"CANONICAL-006"},
+	"canonical.params_self_reference":   {"CANONICAL-019"},
+	"canonical.points_elsewhere":        {"CANONICAL-002", "CANONICAL-003"},
+	"canonical.target_non_200":          {"CANONICAL-008"},
+	"canonical.www_variant":             {"CANONICAL-014"},
 
 	// Content
 	"body.exact_duplicate": {"CONTENT-002"},
@@ -90,6 +100,13 @@ var checklistIDMap = map[string][]string{
 	"headings.h1.too_short":            {"H1-014"},
 	"headings.h2.missing":              {"H1-006"},
 	"headings.hierarchy.skipped_level": {"H1-008"},
+
+	// HTML Structure
+	"html.doctype_missing":         {"HTML-002"},
+	"html.dom_too_deep":            {"HTML-003"},
+	"html.multiple_head":           {"HTML-001"},
+	"html.pagination_link_invalid": {"HTML-006"},
+	"html.robots_meta_in_body":     {"HTML-005"},
 
 	// HTTPS & Security
 	"https.mixed_content":                 {"SSL-006"},

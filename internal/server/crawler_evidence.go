@@ -107,11 +107,17 @@ type CrawlerEvidencePage struct {
 }
 
 type robotsEvidence struct {
-	URL        string
-	Exists     bool
-	ParseOK    bool
-	ParseError string
-	Raw        string
+	URL         string
+	StatusCode  int
+	ContentType string
+	SizeBytes   int
+	Server      string
+	Via         string
+	Exists      bool
+	ParseOK     bool
+	ParseError  string
+	Raw         string
+	Data        *robotstxt.RobotsData
 }
 
 func (h *Handlers) getCrawlerEvidence(w http.ResponseWriter, r *http.Request) {
@@ -249,24 +255,9 @@ func (h *Handlers) runCrawlerEvidence(w http.ResponseWriter, r *http.Request) {
 }
 
 func crawlerEvidenceChecks() []CrawlerEvidenceCheck {
-	return []CrawlerEvidenceCheck{
-		{
-			ID:          "ROBOTS-010",
-			Name:        "robots.txt tested with crawler policy checks",
-			Category:    "Technical SEO",
-			Priority:    "High",
-			CrawlerRole: "Fetch robots.txt, parse rules, and verify the seed URL is crawlable.",
-			Notes:       "GSC tester evidence can be attached later; this pack provides crawler-side policy proof.",
-		},
-		{
-			ID:          "ROBOTS-020",
-			Name:        "Disallow rules for parameter URLs kept updated",
-			Category:    "Technical SEO",
-			Priority:    "High",
-			CrawlerRole: "Discover parameter URLs and compare them to robots.txt disallow coverage.",
-			Notes:       "Useful for filter, sort, city, and tracking parameters.",
-		},
-		{
+	checks := robotsEvidenceChecks()
+	checks = append(checks,
+		CrawlerEvidenceCheck{
 			ID:          "SITEMAP-022",
 			Name:        "CDP URLs updated in sitemap on new inventory",
 			Category:    "Technical SEO",
@@ -274,7 +265,7 @@ func crawlerEvidenceChecks() []CrawlerEvidenceCheck {
 			CrawlerRole: "Compare sitemap URLs with expected inventory URLs or crawler-discovered priority URLs.",
 			Notes:       "Expected inventory can later come from CMS/feed/API.",
 		},
-		{
+		CrawlerEvidenceCheck{
 			ID:          "IMG-013",
 			Name:        "Image CDN configured correctly",
 			Category:    "On-Page SEO",
@@ -282,7 +273,7 @@ func crawlerEvidenceChecks() []CrawlerEvidenceCheck {
 			CrawlerRole: "Inspect discovered image URLs, status codes, content types, and allowed CDN hosts.",
 			Notes:       "Cache header inspection can be added after image HEAD metadata is expanded.",
 		},
-		{
+		CrawlerEvidenceCheck{
 			ID:          "INDEX-015",
 			Name:        "Post-cache-purge content updates reflect live",
 			Category:    "Technical SEO",
@@ -290,17 +281,18 @@ func crawlerEvidenceChecks() []CrawlerEvidenceCheck {
 			CrawlerRole: "Refetch live pages, capture content hashes, and verify required text snippets.",
 			Notes:       "Use required snippets after deploy/cache purge; otherwise this produces a snapshot baseline.",
 		},
-	}
+	)
+	return checks
 }
 
 func analyzeCrawlerEvidence(audit *models.SiteAudit, robots robotsEvidence, req CrawlerEvidenceRunRequest) []CrawlerEvidenceItem {
-	return []CrawlerEvidenceItem{
-		analyzeRobotsTester(audit, robots, req.URL),
-		analyzeParameterDisallows(audit, robots, req),
+	items := analyzeRobotsEvidence(audit, robots, req)
+	items = append(items,
 		analyzeSitemapInventory(audit, req.ExpectedInventoryURLs),
 		analyzeImageCDN(audit, req.AllowedImageCDNHosts),
 		analyzeLiveContent(audit, req.RequiredLiveText),
-	}
+	)
+	return items
 }
 
 func crawlerEvidenceForAudit(ctx context.Context, audit *models.SiteAudit, req StartAuditRequest, timeout time.Duration) []models.EvidenceCheckResult {
@@ -640,6 +632,10 @@ func fetchRobotsEvidence(ctx context.Context, siteURL string, timeout time.Durat
 		return out
 	}
 	defer resp.Body.Close()
+	out.StatusCode = resp.StatusCode
+	out.ContentType = strings.TrimSpace(resp.Header.Get("Content-Type"))
+	out.Server = strings.TrimSpace(resp.Header.Get("Server"))
+	out.Via = strings.TrimSpace(resp.Header.Get("Via"))
 	if resp.StatusCode != http.StatusOK {
 		out.ParseError = fmt.Sprintf("robots.txt returned HTTP %d", resp.StatusCode)
 		return out
@@ -651,11 +647,13 @@ func fetchRobotsEvidence(ctx context.Context, siteURL string, timeout time.Durat
 	}
 	out.Exists = true
 	out.Raw = string(body)
-	_, err = robotstxt.FromString(out.Raw)
+	out.SizeBytes = len(body)
+	data, err := robotstxt.FromString(out.Raw)
 	if err != nil {
 		out.ParseError = err.Error()
 		return out
 	}
+	out.Data = data
 	out.ParseOK = true
 	return out
 }

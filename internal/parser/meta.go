@@ -30,11 +30,21 @@ func ExtractMeta(doc *goquery.Document) (title, metaDesc, canonical, robotsTag, 
 
 	doc.Find("link[rel]").Each(func(_ int, s *goquery.Selection) {
 		rel := strings.ToLower(strings.TrimSpace(s.AttrOr("rel", "")))
-		if rel == "canonical" {
+		if relTokenContains(rel, "canonical") {
 			canonical = strings.TrimSpace(s.AttrOr("href", ""))
 		}
 	})
 	return
+}
+
+func relTokenContains(rel string, token string) bool {
+	token = strings.ToLower(strings.TrimSpace(token))
+	for _, part := range strings.Fields(strings.ToLower(rel)) {
+		if part == token {
+			return true
+		}
+	}
+	return false
 }
 
 // ParseRobotsDirectives merges directives from <meta name="robots"> and

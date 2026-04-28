@@ -12,6 +12,7 @@ const CAT_ICONS = {
   'Crawlability': '🕷',
   'E-E-A-T': '⭐',
   'Headings': '🏷',
+  'HTML Structure': '<>',
   'HTTPS & Security': '🔒',
   'Images': '🖼',
   'Internal Linking': '🔗',

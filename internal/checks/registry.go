@@ -11,6 +11,7 @@ import (
 	"github.com/cars24/seo-automation/internal/checks/crawlability"
 	"github.com/cars24/seo-automation/internal/checks/eeat"
 	"github.com/cars24/seo-automation/internal/checks/headings"
+	"github.com/cars24/seo-automation/internal/checks/html_hygiene"
 	"github.com/cars24/seo-automation/internal/checks/https_security"
 	"github.com/cars24/seo-automation/internal/checks/images"
 	"github.com/cars24/seo-automation/internal/checks/internal_linking"
@@ -57,6 +58,9 @@ func init() {
 		pageChecks = append(pageChecks, c)
 	}
 	for _, c := range headings.PageChecks() {
+		pageChecks = append(pageChecks, c)
+	}
+	for _, c := range html_hygiene.PageChecks() {
 		pageChecks = append(pageChecks, c)
 	}
 	for _, c := range canonical.PageChecks() {
@@ -136,6 +140,9 @@ func init() {
 		siteChecks = append(siteChecks, c)
 	}
 	for _, c := range sitemapcheck.SiteChecks() {
+		siteChecks = append(siteChecks, c)
+	}
+	for _, c := range canonical.SiteChecks() {
 		siteChecks = append(siteChecks, c)
 	}
 

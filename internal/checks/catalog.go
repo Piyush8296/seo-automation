@@ -17,10 +17,20 @@ var checkDescriptors = []models.CheckDescriptor{
 
 	// ── Canonical ───────────────────────────────────────────────────────────
 	{ID: "canonical.conflict_og_url", Category: "Canonical", Description: "Canonical URL does not match the og:url property, sending mixed signals."},
+	{ID: "canonical.chain", Category: "Canonical", Description: "Canonical target points to another canonical target, creating a canonical chain."},
+	{ID: "canonical.country_folder_mismatch", Category: "Canonical", Description: "Canonical URL points to a different country or locale folder than the current page."},
+	{ID: "canonical.has_fragment", Category: "Canonical", Description: "Canonical URL contains a fragment identifier, which search engines ignore."},
+	{ID: "canonical.header_mismatch", Category: "Canonical", Description: "HTTP Link header canonical does not match the HTML canonical tag."},
 	{ID: "canonical.insecure", Category: "Canonical", Description: "Canonical URL uses http:// but the page is served over https://."},
+	{ID: "canonical.in_body", Category: "Canonical", Description: "Canonical tag appears outside the document head."},
+	{ID: "canonical.loop", Category: "Canonical", Description: "Canonical URLs form a loop between crawled pages."},
 	{ID: "canonical.missing", Category: "Canonical", Description: "Page has no canonical tag, leaving search engines to choose the preferred URL."},
+	{ID: "canonical.multiple", Category: "Canonical", Description: "Page has more than one canonical tag."},
 	{ID: "canonical.not_absolute", Category: "Canonical", Description: "Canonical URL is relative; search engines require an absolute URL."},
+	{ID: "canonical.params_self_reference", Category: "Canonical", Description: "Parameterized URL is self-canonical instead of consolidating to a clean URL."},
 	{ID: "canonical.points_elsewhere", Category: "Canonical", Description: "Canonical points to a different URL, consolidating link signals away from this page."},
+	{ID: "canonical.target_non_200", Category: "Canonical", Description: "Canonical target does not return HTTP 200 within the crawl."},
+	{ID: "canonical.www_variant", Category: "Canonical", Description: "Canonical host alternates between www and non-www variants."},
 
 	// ── Content ─────────────────────────────────────────────────────────────
 	{ID: "body.exact_duplicate", Category: "Content", Description: "Page body is an exact duplicate of another crawled page."},
@@ -86,6 +96,13 @@ var checkDescriptors = []models.CheckDescriptor{
 	{ID: "headings.h1.too_short", Category: "Headings", Description: "H1 text is too short to convey meaningful context to search engines."},
 	{ID: "headings.h2.missing", Category: "Headings", Description: "Page has no H2 subheadings; subheadings help structure content for users and crawlers."},
 	{ID: "headings.hierarchy.skipped_level", Category: "Headings", Description: "Heading levels are skipped (e.g. H1 → H3), breaking the logical document outline."},
+
+	// ── HTML Structure ──────────────────────────────────────────────────────
+	{ID: "html.doctype_missing", Category: "HTML Structure", Description: "Page is missing a <!DOCTYPE html> declaration, which can trigger browser quirks mode."},
+	{ID: "html.dom_too_deep", Category: "HTML Structure", Description: "Page DOM is nested 32 or more element levels deep, which can hurt render performance and crawl efficiency."},
+	{ID: "html.multiple_head", Category: "HTML Structure", Description: "Page has more than one <head> tag, which can break parsing of metadata, canonical tags, and schema."},
+	{ID: "html.pagination_link_invalid", Category: "HTML Structure", Description: "Page uses rel=next/prev pagination markup with invalid placement, hrefs, duplicates, or self-references."},
+	{ID: "html.robots_meta_in_body", Category: "HTML Structure", Description: "Robots meta tag appears outside <head>, where search engines may ignore it."},
 
 	// ── HTTPS & Security ────────────────────────────────────────────────────
 	{ID: "https.mixed_content", Category: "HTTPS & Security", Description: "Page is served over HTTPS but loads resources (images, scripts, CSS) over HTTP."},
