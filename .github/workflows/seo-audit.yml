@@ -8,7 +8,7 @@ on:
       url:
         description: 'URL to audit'
         required: true
-        default: 'https://www.cars24.com'
+        default: 'https://www.google.com'
       max_depth:
         description: 'Max crawl depth (-1 = unlimited)'
         required: false
@@ -57,7 +57,7 @@ jobs:
       - name: Determine audit URL
         id: vars
         run: |
-          echo "url=${{ github.event.inputs.url || 'https://www.cars24.com' }}" >> $GITHUB_OUTPUT
+          echo "url=${{ github.event.inputs.url || 'https://www.google.com' }}" >> $GITHUB_OUTPUT
           echo "max_depth=${{ github.event.inputs.max_depth || '3' }}" >> $GITHUB_OUTPUT
           echo "max_pages=${{ github.event.inputs.max_pages || '500' }}" >> $GITHUB_OUTPUT
           echo "concurrency=${{ github.event.inputs.concurrency || '5' }}" >> $GITHUB_OUTPUT
