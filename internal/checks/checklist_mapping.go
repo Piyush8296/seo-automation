@@ -276,16 +276,22 @@ var checklistIDMap = map[string][]string{
 	"title.too_short": {"TITLE-003"},
 
 	// URL Structure
-	"url.contains_stop_words": {"URL-011"},
-	"url.double_slash":        {"URL-002"},
-	"url.has_session_params":  {"URL-014"},
-	"url.has_spaces":          {"URL-002"},
-	"url.has_underscores":     {"URL-002"},
-	"url.has_uppercase":       {"URL-001"},
-	"url.non_descriptive":     {"URL-003"},
-	"url.path_depth_too_deep": {"URL-004"},
-	"url.too_long":            {"URL-009"},
-	"url.too_many_params":     {"URL-005", "URL-013"},
+	"url.breadcrumb_mismatch":         {"URL-012"},
+	"url.consistent_structure":        {"URL-010"},
+	"url.contains_stop_words":         {"URL-011"},
+	"url.double_slash":                {"URL-002"},
+	"url.has_session_params":          {"URL-014"},
+	"url.has_spaces":                  {"URL-002"},
+	"url.has_underscores":             {"URL-002"},
+	"url.has_uppercase":               {"URL-001"},
+	"url.keyword_topic_mismatch":      {"URL-007"},
+	"url.non_ascii":                   {"URL-016"},
+	"url.non_descriptive":             {"URL-003"},
+	"url.path_depth_too_deep":         {"URL-004"},
+	"url.print_canonical_conflict":    {"URL-015"},
+	"url.too_long":                    {"URL-009"},
+	"url.too_many_params":             {"URL-005", "URL-013"},
+	"url.trailing_slash_inconsistent": {"URL-017"},
 }
 
 // ChecklistIDsFor returns the registry checklist IDs associated with an

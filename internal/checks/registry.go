@@ -145,6 +145,9 @@ func init() {
 	for _, c := range canonical.SiteChecks() {
 		siteChecks = append(siteChecks, c)
 	}
+	for _, c := range url_structure.SiteChecks() {
+		siteChecks = append(siteChecks, c)
+	}
 
 	// ── Site-wide checks (expert additions) ─────────────────────────────────
 	for _, c := range pagination.SiteChecks() {

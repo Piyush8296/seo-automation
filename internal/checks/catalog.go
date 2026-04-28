@@ -273,13 +273,19 @@ var checkDescriptors = []models.CheckDescriptor{
 
 	// ── URL Structure ───────────────────────────────────────────────────────
 	{ID: "url.contains_stop_words", Category: "URL Structure", Description: "URL contains common stop words (a, the, and…) that add length without SEO value."},
+	{ID: "url.breadcrumb_mismatch", Category: "URL Structure", Description: "BreadcrumbList schema does not align with the current URL path or page topic."},
+	{ID: "url.consistent_structure", Category: "URL Structure", Description: "Similar URLs in a site section use inconsistent depth or hierarchy patterns."},
 	{ID: "url.double_slash", Category: "URL Structure", Description: "URL contains double slashes (//), which may cause duplicate content or crawl issues."},
 	{ID: "url.has_session_params", Category: "URL Structure", Description: "URL contains session ID parameters, creating unique duplicate pages for each session."},
 	{ID: "url.has_spaces", Category: "URL Structure", Description: "URL contains spaces encoded as %20; use hyphens to separate words instead."},
 	{ID: "url.has_underscores", Category: "URL Structure", Description: "URL uses underscores instead of hyphens; Google treats underscores as word joiners."},
 	{ID: "url.has_uppercase", Category: "URL Structure", Description: "URL contains uppercase letters, risking duplicate content at different case variants."},
+	{ID: "url.keyword_topic_mismatch", Category: "URL Structure", Description: "Meaningful URL keywords are not reflected in the page title, H1, or visible text."},
+	{ID: "url.non_ascii", Category: "URL Structure", Description: "URL contains non-ASCII characters or encoded non-ASCII bytes."},
 	{ID: "url.non_descriptive", Category: "URL Structure", Description: "URL slug is non-descriptive (numeric ID or random string) with no keyword value."},
 	{ID: "url.path_depth_too_deep", Category: "URL Structure", Description: "URL has too many path segments, signalling low priority to crawlers."},
+	{ID: "url.print_canonical_conflict", Category: "URL Structure", Description: "Print-friendly URL is missing or misusing canonical tags instead of pointing to the main page."},
+	{ID: "url.trailing_slash_inconsistent", Category: "URL Structure", Description: "Site exposes duplicate or mixed trailing-slash URL patterns."},
 	{ID: "url.too_long", Category: "URL Structure", Description: "URL exceeds 2048 characters, which may cause issues with browsers and crawlers."},
 	{ID: "url.too_many_params", Category: "URL Structure", Description: "URL has too many query parameters, risking crawl budget waste and duplicate content."},
 }
