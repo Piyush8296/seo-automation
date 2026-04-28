@@ -48,6 +48,9 @@ func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 	}
 
 	// Check robots.txt metadata
+	if c.config.OnProgress != nil {
+		c.config.OnProgress(0, "Preparing crawl: checking robots.txt")
+	}
 	audit.RobotsTxtMissing = c.robotsCache.IsMissing(ctx, c.config.SeedURL)
 	audit.RobotsBlocksAll = c.robotsCache.BlocksAll(ctx, c.config.SeedURL)
 	audit.RobotsSitemapDir = c.robotsCache.HasSitemapDirective(ctx, c.config.SeedURL)
@@ -55,11 +58,21 @@ func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 	// Fetch sitemap URLs
 	sitemapURL := c.config.SitemapURL
 	if c.config.SitemapMode != models.SitemapModeOff && sitemapURL == "" {
+		if c.config.OnProgress != nil {
+			c.config.OnProgress(0, "Preparing crawl: discovering sitemap")
+		}
 		sitemapURL = DiscoverSitemapURL(ctx, c.fetcher, c.robotsCache, c.config.SeedURL)
 	}
 	sitemapSet := make(map[string]bool)
 	if c.config.SitemapMode != models.SitemapModeOff && sitemapURL != "" {
-		entries, _ := FetchSitemapURLs(ctx, c.fetcher, sitemapURL)
+		if c.config.OnProgress != nil {
+			c.config.OnProgress(0, "Preparing crawl: sampling sitemap URLs")
+		}
+		limit := 0
+		if c.config.SitemapMode == models.SitemapModeDiscover {
+			limit = sitemapDiscoverLimit(c.config.MaxPages)
+		}
+		entries, _ := FetchSitemapURLsLimit(ctx, c.fetcher, sitemapURL, limit)
 		for _, e := range entries {
 			key := DedupeKey(e.URL)
 			sitemapSet[key] = true
@@ -99,6 +112,10 @@ func (c *Crawler) Crawl(ctx context.Context) (*models.SiteAudit, error) {
 		for _, sitemapURL := range audit.SitemapURLs {
 			enqueue(sitemapURL, 0)
 		}
+	}
+
+	if c.config.OnProgress != nil {
+		c.config.OnProgress(0, "Preparing crawl: launching workers")
 	}
 
 	// Drain queue until empty and all workers done
@@ -182,4 +199,18 @@ done:
 	}
 
 	return audit, nil
+}
+
+func sitemapDiscoverLimit(maxPages int) int {
+	if maxPages <= 0 {
+		return 2000
+	}
+	limit := maxPages * 10
+	if limit < 200 {
+		return 200
+	}
+	if limit > 5000 {
+		return 5000
+	}
+	return limit
 }

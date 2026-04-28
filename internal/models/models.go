@@ -49,20 +49,35 @@ const (
 
 // CheckDescriptor describes a registered check for catalog display.
 type CheckDescriptor struct {
-	ID          string `json:"id"`
-	Category    string `json:"category"`
-	Description string `json:"description"`
+	ID           string   `json:"id"`
+	Category     string   `json:"category"`
+	Description  string   `json:"description"`
+	ChecklistIDs []string `json:"checklist_ids,omitempty"`
 }
 
 // CheckResult is a single SEO finding on a page or site-wide
 type CheckResult struct {
-	ID       string   `json:"id"`
-	Category string   `json:"category"`
-	Severity Severity `json:"severity"`
-	Message  string   `json:"message"`
-	URL      string   `json:"url"`
-	Details  string   `json:"details,omitempty"`
-	Platform Platform `json:"platform,omitempty"`
+	ID           string   `json:"id"`
+	Category     string   `json:"category"`
+	Severity     Severity `json:"severity"`
+	Message      string   `json:"message"`
+	URL          string   `json:"url"`
+	Details      string   `json:"details,omitempty"`
+	Platform     Platform `json:"platform,omitempty"`
+	ChecklistIDs []string `json:"checklist_ids,omitempty"`
+}
+
+// EvidenceCheckResult stores pass/fail/non-issue evidence for checks that are
+// broader than the issue-only CheckResult model.
+type EvidenceCheckResult struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Category     string   `json:"category,omitempty"`
+	Status       string   `json:"status"`
+	Message      string   `json:"message"`
+	Details      string   `json:"details,omitempty"`
+	Evidence     []string `json:"evidence,omitempty"`
+	ChecklistIDs []string `json:"checklist_ids,omitempty"`
 }
 
 // PageCheck runs on a single page
@@ -248,27 +263,29 @@ type CrawlConfigSnapshot struct {
 
 // SiteAudit is the top-level result of a complete site crawl + analysis
 type SiteAudit struct {
-	SiteURL            string              `json:"site_url"`
-	CrawledAt          time.Time           `json:"crawled_at"`
-	CrawlConfig        CrawlConfigSnapshot `json:"crawl_config"`
-	PagesTotal         int                 `json:"pages_total"`
-	PagesCrawled       int                 `json:"pages_crawled"`
-	Pages              []*PageData         `json:"pages"`
-	SiteChecks         []CheckResult       `json:"site_checks"`
-	HealthScore        float64             `json:"health_score"`
-	Grade              string              `json:"grade"`
-	DesktopHealthScore float64             `json:"desktop_health_score"`
-	DesktopGrade       string              `json:"desktop_grade"`
-	MobileHealthScore  float64             `json:"mobile_health_score"`
-	MobileGrade        string              `json:"mobile_grade"`
-	Stats              AuditStats          `json:"stats"`
-	DesktopStats       AuditStats          `json:"desktop_stats"`
-	MobileStats        AuditStats          `json:"mobile_stats"`
-	RobotsTxtMissing   bool                `json:"robots_txt_missing"`
-	RobotsBlocksAll    bool                `json:"robots_blocks_all"`
-	RobotsSitemapDir   bool                `json:"robots_has_sitemap_directive"`
-	SitemapURLs        []string            `json:"sitemap_urls"`
-	SitemapPageCount   int                 `json:"sitemap_page_count"`
+	SiteURL            string                `json:"site_url"`
+	CrawledAt          time.Time             `json:"crawled_at"`
+	CrawlConfig        CrawlConfigSnapshot   `json:"crawl_config"`
+	PagesTotal         int                   `json:"pages_total"`
+	PagesCrawled       int                   `json:"pages_crawled"`
+	Pages              []*PageData           `json:"pages"`
+	SiteChecks         []CheckResult         `json:"site_checks"`
+	CrawlerEvidence    []EvidenceCheckResult `json:"crawler_evidence,omitempty"`
+	RenderedSEO        []EvidenceCheckResult `json:"rendered_seo,omitempty"`
+	HealthScore        float64               `json:"health_score"`
+	Grade              string                `json:"grade"`
+	DesktopHealthScore float64               `json:"desktop_health_score"`
+	DesktopGrade       string                `json:"desktop_grade"`
+	MobileHealthScore  float64               `json:"mobile_health_score"`
+	MobileGrade        string                `json:"mobile_grade"`
+	Stats              AuditStats            `json:"stats"`
+	DesktopStats       AuditStats            `json:"desktop_stats"`
+	MobileStats        AuditStats            `json:"mobile_stats"`
+	RobotsTxtMissing   bool                  `json:"robots_txt_missing"`
+	RobotsBlocksAll    bool                  `json:"robots_blocks_all"`
+	RobotsSitemapDir   bool                  `json:"robots_has_sitemap_directive"`
+	SitemapURLs        []string              `json:"sitemap_urls"`
+	SitemapPageCount   int                   `json:"sitemap_page_count"`
 }
 
 // AuditStats aggregates counts of issues across severity levels

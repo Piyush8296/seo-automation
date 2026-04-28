@@ -235,10 +235,20 @@ func (m *Manager) runAudit(ctx context.Context, id string, req StartAuditRequest
 		page.CheckResults = checks.RunPageChecks(page)
 	}
 	audit.SiteChecks = checks.RunSiteWideChecks(audit.Pages)
+	if req.EnableCrawlerEvidence == nil || *req.EnableCrawlerEvidence {
+		audit.CrawlerEvidence = crawlerEvidenceForAudit(ctx, audit, req, timeout)
+		audit.SiteChecks = append(audit.SiteChecks, crawlerEvidenceFindings(audit.CrawlerEvidence)...)
+	}
+	if req.EnableRenderedSEO == nil || *req.EnableRenderedSEO {
+		m.hub.Broadcast(id, ProgressEvent{Type: "progress", PagesCrawled: audit.PagesCrawled, CurrentURL: "Running rendered SEO checks"})
+		audit.RenderedSEO = renderedSEOForAudit(ctx, audit, req, timeout)
+		audit.SiteChecks = append(audit.SiteChecks, renderedSEOFindings(audit.RenderedSEO)...)
+	}
 
 	if platform == models.PlatformDesktop || platform == models.PlatformMobile {
 		filterByPlatform(audit, platform)
 	}
+	checks.AttachChecklistMappings(audit)
 
 	// ── Score ──────────────────────────────────────────────────────────────
 	report.ComputeHealthScore(audit)

@@ -14,30 +14,38 @@ const (
 
 // StartAuditRequest is the JSON body sent to POST /api/audits.
 type StartAuditRequest struct {
-	URL                      string `json:"url"`
-	Scope                    string `json:"scope,omitempty"`
-	ScopePrefix              string `json:"scope_prefix,omitempty"`
-	SitemapURL               string `json:"sitemap_url,omitempty"`
-	SitemapMode              string `json:"sitemap_mode,omitempty"`
-	MaxDepth                 int    `json:"max_depth"`
-	MaxPages                 int    `json:"max_pages"`
-	Concurrency              int    `json:"concurrency"`
-	Timeout                  string `json:"timeout"`
-	Platform                 string `json:"platform"`
-	UserAgent                string `json:"user_agent,omitempty"`
-	MobileUserAgent          string `json:"mobile_user_agent,omitempty"`
-	RespectRobots            *bool  `json:"respect_robots,omitempty"`
-	MaxRedirects             int    `json:"max_redirects,omitempty"`
-	MaxPageSizeKB            int64  `json:"max_page_size_kb,omitempty"`
-	MaxURLLength             int    `json:"max_url_length,omitempty"`
-	MaxQueryParams           int    `json:"max_query_params,omitempty"`
-	MaxLinksPerPage          int    `json:"max_links_per_page,omitempty"`
-	FollowNofollowLinks      bool   `json:"follow_nofollow_links,omitempty"`
-	ExpandNoindexPages       *bool  `json:"expand_noindex_pages,omitempty"`
-	ExpandCanonicalizedPages *bool  `json:"expand_canonicalized_pages,omitempty"`
-	OutputDir                string `json:"output_dir"`              // optional — overrides default storage dir
-	ValidateExternalLinks    bool   `json:"validate_external_links"` // opt-in external link validation
-	DiscoverResources        bool   `json:"discover_resources"`      // opt-in CSS/JS/font sub-resource discovery
+	URL                      string   `json:"url"`
+	Scope                    string   `json:"scope,omitempty"`
+	ScopePrefix              string   `json:"scope_prefix,omitempty"`
+	SitemapURL               string   `json:"sitemap_url,omitempty"`
+	SitemapMode              string   `json:"sitemap_mode,omitempty"`
+	MaxDepth                 int      `json:"max_depth"`
+	MaxPages                 int      `json:"max_pages"`
+	Concurrency              int      `json:"concurrency"`
+	Timeout                  string   `json:"timeout"`
+	Platform                 string   `json:"platform"`
+	UserAgent                string   `json:"user_agent,omitempty"`
+	MobileUserAgent          string   `json:"mobile_user_agent,omitempty"`
+	RespectRobots            *bool    `json:"respect_robots,omitempty"`
+	MaxRedirects             int      `json:"max_redirects,omitempty"`
+	MaxPageSizeKB            int64    `json:"max_page_size_kb,omitempty"`
+	MaxURLLength             int      `json:"max_url_length,omitempty"`
+	MaxQueryParams           int      `json:"max_query_params,omitempty"`
+	MaxLinksPerPage          int      `json:"max_links_per_page,omitempty"`
+	FollowNofollowLinks      bool     `json:"follow_nofollow_links,omitempty"`
+	ExpandNoindexPages       *bool    `json:"expand_noindex_pages,omitempty"`
+	ExpandCanonicalizedPages *bool    `json:"expand_canonicalized_pages,omitempty"`
+	OutputDir                string   `json:"output_dir"`              // optional — overrides default storage dir
+	ValidateExternalLinks    bool     `json:"validate_external_links"` // opt-in external link validation
+	DiscoverResources        bool     `json:"discover_resources"`      // opt-in CSS/JS/font sub-resource discovery
+	EnableCrawlerEvidence    *bool    `json:"enable_crawler_evidence,omitempty"`
+	ExpectedInventoryURLs    []string `json:"expected_inventory_urls,omitempty"`
+	ExpectedParameterNames   []string `json:"expected_parameter_names,omitempty"`
+	AllowedImageCDNHosts     []string `json:"allowed_image_cdn_hosts,omitempty"`
+	RequiredLiveText         []string `json:"required_live_text,omitempty"`
+	EnableRenderedSEO        *bool    `json:"enable_rendered_seo,omitempty"`
+	RenderedSampleLimit      int      `json:"rendered_sample_limit,omitempty"`
+	RenderedTimeout          string   `json:"rendered_timeout,omitempty"`
 }
 
 // AuditRecord is the persistent metadata for one audit run, stored as meta.json.

@@ -10,9 +10,18 @@ const DEFAULTS = {
   concurrency: 10,
   timeout: '30s',
   platform: '',
+  sitemap_mode: 'off',
   output_dir: '',
   validate_external_links: true,
   discover_resources: true,
+  enable_crawler_evidence: true,
+  enable_rendered_seo: true,
+  rendered_sample_limit: 5,
+  rendered_timeout: '20s',
+  expected_inventory_urls: '',
+  expected_parameter_names: '',
+  allowed_image_cdn_hosts: '',
+  required_live_text: '',
 }
 
 const TIPS = {
@@ -22,9 +31,13 @@ const TIPS = {
   timeout:                'Maximum time allowed per individual HTTP request. Increase for slow servers.',
   concurrency:            'Number of pages fetched in parallel. Higher values finish faster but put more load on the target server.',
   platform:               'Choose "Both" to run a full desktop + mobile bifurcated audit. "Desktop only" skips the mobile fetch. "Mobile focus" surfaces only mobile and mobile-vs-desktop issues.',
+  sitemap_mode:           'Off starts crawling immediately from the URL. Discover samples sitemap URLs for coverage checks. Seed also adds sitemap URLs to the crawl queue and can be slow on large sites.',
   output_dir:             'Folder where HTML, JSON and Markdown reports are saved. Defaults to ~/.seo-reports if left blank.',
   validate_external_links:'Sends a HEAD request to every outbound link to check for broken URLs. Significantly increases total crawl time.',
   discover_resources:     'Validates every CSS, JavaScript and font file referenced by crawled pages. Very slow on large sites.',
+  enable_rendered_seo:    'Runs a small Playwright/Chrome pass against sampled pages and compares raw HTML with the rendered DOM for JavaScript SEO risks.',
+  rendered_sample_limit:  'Number of crawled pages to render in the browser pass. Higher values improve coverage but add time.',
+  rendered_timeout:       'Maximum browser render time per sampled page.',
 }
 
 function Tooltip({ text }) {
@@ -89,6 +102,13 @@ function Label({ children, tip }) {
   )
 }
 
+function splitLines(value) {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
 export default function Home() {
   const [starting, setStarting] = useState(false)
   const [checkCount, setCheckCount] = useState(null)
@@ -118,6 +138,11 @@ export default function Home() {
         max_depth: Number(form.max_depth),
         max_pages: Number(form.max_pages),
         concurrency: Number(form.concurrency),
+        expected_inventory_urls: splitLines(form.expected_inventory_urls),
+        expected_parameter_names: splitLines(form.expected_parameter_names),
+        allowed_image_cdn_hosts: splitLines(form.allowed_image_cdn_hosts),
+        required_live_text: splitLines(form.required_live_text),
+        rendered_sample_limit: Number(form.rendered_sample_limit),
       })
       navigate(`/audit/${record.id}`)
     } catch (err) {
@@ -328,6 +353,19 @@ export default function Home() {
                     disabled={starting}
                   />
                 </div>
+                <div>
+                  <Label tip={TIPS.sitemap_mode}>Sitemap mode</Label>
+                  <select
+                    value={form.sitemap_mode}
+                    onChange={(e) => set('sitemap_mode', e.target.value)}
+                    className="input"
+                    disabled={starting}
+                  >
+                    <option value="off">Off (fastest)</option>
+                    <option value="discover">Discover for coverage</option>
+                    <option value="seed">Seed crawl from sitemap</option>
+                  </select>
+                </div>
                 <div className="flex flex-col gap-3" style={{ borderTop: '1px solid rgba(60,74,60,0.3)', paddingTop: '1rem' }}>
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
@@ -363,7 +401,114 @@ export default function Home() {
                       <div className="text-xs text-on-surface-variant">Validates stylesheets, scripts and fonts. Slow.</div>
                     </div>
                   </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.enable_crawler_evidence}
+                      onChange={(e) => set('enable_crawler_evidence', e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded"
+                      style={{ accentColor: '#3fe56c' }}
+                      disabled={starting}
+                    />
+                    <div>
+                      <div className="text-sm text-on-surface">Run crawler evidence checks</div>
+                      <div className="text-xs text-on-surface-variant">Adds robots, sitemap, image CDN, and live-content evidence to this audit.</div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.enable_rendered_seo}
+                      onChange={(e) => set('enable_rendered_seo', e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded"
+                      style={{ accentColor: '#3fe56c' }}
+                      disabled={starting}
+                    />
+                    <div>
+                      <div className="text-sm text-on-surface flex items-center gap-1.5">
+                        Run rendered JavaScript SEO checks
+                        <Tooltip text={TIPS.enable_rendered_seo} />
+                      </div>
+                      <div className="text-xs text-on-surface-variant">Browser-renders sampled pages and compares raw HTML vs rendered DOM.</div>
+                    </div>
+                  </label>
                 </div>
+                {form.enable_rendered_seo && (
+                  <div className="grid grid-cols-2 gap-4 pt-4" style={{ borderTop: '1px solid rgba(60,74,60,0.3)' }}>
+                    <div>
+                      <Label tip={TIPS.rendered_sample_limit}>Rendered sample size</Label>
+                      <select
+                        value={form.rendered_sample_limit}
+                        onChange={(e) => set('rendered_sample_limit', e.target.value)}
+                        className="input"
+                        disabled={starting}
+                      >
+                        <option value={3}>3 pages</option>
+                        <option value={5}>5 pages</option>
+                        <option value={10}>10 pages</option>
+                        <option value={20}>20 pages</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label tip={TIPS.rendered_timeout}>Rendered page timeout</Label>
+                      <select
+                        value={form.rendered_timeout}
+                        onChange={(e) => set('rendered_timeout', e.target.value)}
+                        className="input"
+                        disabled={starting}
+                      >
+                        <option value="10s">10 seconds</option>
+                        <option value="20s">20 seconds</option>
+                        <option value="30s">30 seconds</option>
+                        <option value="45s">45 seconds</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+                {form.enable_crawler_evidence && (
+                  <div className="grid grid-cols-2 gap-4 pt-4" style={{ borderTop: '1px solid rgba(60,74,60,0.3)' }}>
+                    <div>
+                      <label className="label">Expected inventory URLs</label>
+                      <textarea
+                        className="input text-sm min-h-[88px]"
+                        value={form.expected_inventory_urls}
+                        onChange={(e) => set('expected_inventory_urls', e.target.value)}
+                        placeholder="One URL per line"
+                        disabled={starting}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Expected URL parameters</label>
+                      <textarea
+                        className="input text-sm min-h-[88px]"
+                        value={form.expected_parameter_names}
+                        onChange={(e) => set('expected_parameter_names', e.target.value)}
+                        placeholder={'sort\nfilter\ncity'}
+                        disabled={starting}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Allowed image CDN hosts</label>
+                      <textarea
+                        className="input text-sm min-h-[88px]"
+                        value={form.allowed_image_cdn_hosts}
+                        onChange={(e) => set('allowed_image_cdn_hosts', e.target.value)}
+                        placeholder="images.examplecdn.com"
+                        disabled={starting}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Required live text</label>
+                      <textarea
+                        className="input text-sm min-h-[88px]"
+                        value={form.required_live_text}
+                        onChange={(e) => set('required_live_text', e.target.value)}
+                        placeholder="One expected snippet per line"
+                        disabled={starting}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

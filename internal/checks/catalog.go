@@ -252,6 +252,9 @@ var checkDescriptors = []models.CheckDescriptor{
 func GetCheckDescriptors() []models.CheckDescriptor {
 	result := make([]models.CheckDescriptor, len(checkDescriptors))
 	copy(result, checkDescriptors)
+	for i := range result {
+		result[i].ChecklistIDs = ChecklistIDsFor(result[i].ID)
+	}
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].Category != result[j].Category {
 			return result[i].Category < result[j].Category

@@ -154,6 +154,23 @@ function PlatformBadge({ platform }) {
   )
 }
 
+function ChecklistIDBadges({ ids }) {
+  if (!ids?.length) return null
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {ids.map((id) => (
+        <span
+          key={id}
+          className="font-mono rounded px-1.5 py-0.5"
+          style={{ fontSize: '9px', color: '#9cc7ff', background: 'rgba(156,199,255,0.08)', border: '1px solid rgba(156,199,255,0.12)' }}
+        >
+          {id}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function IssueTable({ auditId }) {
   const [report, setReport] = useState(null)
   const [err, setErr] = useState('')
@@ -185,7 +202,10 @@ export default function IssueTable({ auditId }) {
 
   const checkIDs = useMemo(() => {
     const s = new Set()
-    allIssues.forEach((i) => i.id && s.add(i.id))
+    allIssues.forEach((i) => {
+      if (i.id) s.add(i.id)
+      for (const id of i.checklist_ids ?? []) s.add(id)
+    })
     return [...s].sort()
   }, [allIssues])
 
@@ -199,7 +219,7 @@ export default function IssueTable({ auditId }) {
     return allIssues
       .filter((i) => !severity || i.severity === severity)
       .filter((i) => !category || i.category === category)
-      .filter((i) => !checkID || i.id === checkID)
+      .filter((i) => !checkID || i.id === checkID || (i.checklist_ids ?? []).includes(checkID))
       .filter((i) => {
         if (!platform) return true
         const p = i.platform || 'both'
@@ -208,7 +228,13 @@ export default function IssueTable({ auditId }) {
         if (platform === 'both')    return !p || p === 'both'
         return p === platform
       })
-      .filter((i) => !q || (i.pageURL || '').toLowerCase().includes(q) || (i.message || '').toLowerCase().includes(q))
+      .filter((i) =>
+        !q ||
+        (i.pageURL || '').toLowerCase().includes(q) ||
+        (i.message || '').toLowerCase().includes(q) ||
+        (i.id || '').toLowerCase().includes(q) ||
+        (i.checklist_ids ?? []).some((id) => id.toLowerCase().includes(q))
+      )
       .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
   }, [allIssues, severity, category, checkID, platform, search])
 
@@ -263,7 +289,7 @@ export default function IssueTable({ auditId }) {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search URL or message…"
+            placeholder="Search URL, message, or checklist ID…"
             className="input text-sm pl-8"
           />
         </div>
@@ -334,7 +360,7 @@ export default function IssueTable({ auditId }) {
               <tr>
                 <th className="w-8" />
                 <th className="text-left font-medium px-3 py-2.5">Severity</th>
-                <th className="text-left font-medium px-3 py-2.5">Check</th>
+                <th className="text-left font-medium px-3 py-2.5">Check / Checklist</th>
                 <th className="text-left font-medium px-3 py-2.5">Category</th>
                 <th className="text-left font-medium px-3 py-2.5">Platform</th>
                 <th className="text-left font-medium px-3 py-2.5">URL</th>
@@ -361,6 +387,7 @@ export default function IssueTable({ auditId }) {
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         <code className="text-xs font-mono" style={{ color: '#3fe56c' }}>{issue.id}</code>
+                        <ChecklistIDBadges ids={issue.checklist_ids} />
                       </td>
                       <td className="px-3 py-2.5 align-top text-xs text-on-surface-variant">{issue.category}</td>
                       <td className="px-3 py-2.5 align-top whitespace-nowrap">

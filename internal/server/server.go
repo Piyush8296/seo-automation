@@ -119,6 +119,23 @@ func (s *Server) Handler() http.Handler {
 		s.h.submitSearchIntegrationAction(w, r)
 	})
 
+	// Crawler evidence workspace and bounded crawler-backed report.
+	mux.HandleFunc("/api/crawler-evidence", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.getCrawlerEvidence(w, r)
+	})
+
+	mux.HandleFunc("/api/crawler-evidence/run", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.h.runCrawlerEvidence(w, r)
+	})
+
 	// Root collection: list + create
 	mux.HandleFunc("/api/audits", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

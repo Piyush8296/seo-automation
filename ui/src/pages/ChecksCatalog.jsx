@@ -38,6 +38,29 @@ function groupByCategory(checks) {
   return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
 }
 
+function ChecklistBadges({ ids }) {
+  if (!ids?.length) {
+    return (
+      <span className="font-mono text-on-surface-variant" style={{ fontSize: '9px' }}>
+        unmapped
+      </span>
+    )
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {ids.map((id) => (
+        <span
+          key={id}
+          className="font-mono rounded px-1.5 py-0.5"
+          style={{ fontSize: '9px', color: '#9cc7ff', background: 'rgba(156,199,255,0.08)', border: '1px solid rgba(156,199,255,0.12)' }}
+        >
+          {id}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function ChecksCatalog() {
   const navigate = useNavigate()
   const [catalog, setCatalog] = useState(null)
@@ -53,12 +76,17 @@ export default function ChecksCatalog() {
   const toggle = (cat) => setExpanded((prev) => ({ ...prev, [cat]: !prev[cat] }))
 
   const query = search.trim().toLowerCase()
+  const mappedChecks = catalog ? catalog.checks.filter((c) => c.checklist_ids?.length).length : 0
+  const checklistIDCount = catalog
+    ? new Set(catalog.checks.flatMap((c) => c.checklist_ids ?? [])).size
+    : 0
   const groups = catalog
     ? groupByCategory(
         query
           ? catalog.checks.filter((c) =>
-              c.id.includes(query) ||
+              c.id.toLowerCase().includes(query) ||
               c.category.toLowerCase().includes(query) ||
+              (c.checklist_ids ?? []).some((id) => id.toLowerCase().includes(query)) ||
               c.description?.toLowerCase().includes(query)
             )
           : catalog.checks
@@ -135,6 +163,8 @@ export default function ChecksCatalog() {
                 { label: 'Page Runners', value: catalog.page_checks },
                 { label: 'Site Runners', value: catalog.site_checks },
                 { label: 'Categories', value: groups.length || groupByCategory(catalog.checks).length },
+                { label: 'Mapped Checks', value: mappedChecks },
+                { label: 'Checklist IDs', value: checklistIDCount },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <div className="uppercase tracking-widest text-on-surface-variant" style={{ fontSize: '8px' }}>{label}</div>
@@ -170,6 +200,7 @@ export default function ChecksCatalog() {
               style={{ background: '#1a202a', fontSize: '10px' }}
             >
               {catalog.check_ids} checks · {groupByCategory(catalog.checks).length} categories
+              {mappedChecks > 0 && ` · ${mappedChecks} mapped`}
             </span>
           )}
         </header>
@@ -180,7 +211,7 @@ export default function ChecksCatalog() {
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#bbcbb8' }} />
             <input
               className="input pl-9 text-sm"
-              placeholder="Filter by check ID or category…"
+              placeholder="Filter by internal ID, checklist ID, or category…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -232,12 +263,15 @@ export default function ChecksCatalog() {
                             key={c.id}
                             className="flex items-start gap-3 px-4 py-2.5 hover:bg-surface-bright transition-colors"
                           >
-                            <code
-                              className="font-mono shrink-0 rounded px-2 py-0.5 text-primary"
-                              style={{ fontSize: '10px', background: 'rgba(63,229,108,0.08)', border: '1px solid rgba(63,229,108,0.15)' }}
-                            >
-                              {c.id}
-                            </code>
+                            <div className="w-[210px] shrink-0 flex flex-col gap-1.5">
+                              <code
+                                className="font-mono w-fit rounded px-2 py-0.5 text-primary"
+                                style={{ fontSize: '10px', background: 'rgba(63,229,108,0.08)', border: '1px solid rgba(63,229,108,0.15)' }}
+                              >
+                                {c.id}
+                              </code>
+                              <ChecklistBadges ids={c.checklist_ids} />
+                            </div>
                             <span className="text-on-surface-variant leading-snug" style={{ fontSize: '12px' }}>
                               {c.description}
                             </span>

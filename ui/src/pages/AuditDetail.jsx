@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Play, AlertCircle, Table as TableIcon, FileText, Globe2, Settings, CheckSquare, Database, MapPinned, Search } from 'lucide-react'
+import { Activity, ArrowLeft, Play, AlertCircle, Table as TableIcon, FileText, Globe2, Settings, CheckSquare, Database, MapPinned, Search, Code2 } from 'lucide-react'
 import { useSSE } from '../hooks/useSSE'
 import { api } from '../lib/api'
 import CrawlProgress from '../components/CrawlProgress'
@@ -247,15 +247,129 @@ export default function AuditDetail() {
                 style={{ borderBottom: '1px solid rgba(60,74,60,0.4)' }}
               >
                 <TabButton active={reportTab === 'table'} onClick={() => setReportTab('table')} icon={TableIcon} label="Issue Table" />
+                <TabButton active={reportTab === 'evidence'} onClick={() => setReportTab('evidence')} icon={Activity} label="Crawler Evidence" />
+                <TabButton active={reportTab === 'rendered'} onClick={() => setReportTab('rendered')} icon={Code2} label="Rendered SEO" />
                 <TabButton active={reportTab === 'html'}  onClick={() => setReportTab('html')}  icon={FileText}  label="HTML Report" />
               </div>
-              {reportTab === 'table' ? <IssueTable auditId={id} /> : <ReportViewer auditId={id} />}
+              {reportTab === 'table' && <IssueTable auditId={id} />}
+              {reportTab === 'evidence' && <CrawlerEvidencePanel auditId={id} />}
+              {reportTab === 'rendered' && <RenderedSEOPanel auditId={id} />}
+              {reportTab === 'html' && <ReportViewer auditId={id} />}
             </div>
           </>
         )}
 
       </main>
       </div>
+    </div>
+  )
+}
+
+const EVIDENCE_META = {
+  pass: { label: 'Pass', color: '#3fe56c', bg: 'rgba(63,229,108,0.08)' },
+  warning: { label: 'Warning', color: '#ffb7ae', bg: 'rgba(255,183,174,0.08)' },
+  fail: { label: 'Fail', color: '#ffb4ab', bg: 'rgba(255,180,171,0.1)' },
+  needs_input: { label: 'Needs input', color: '#9cc7ff', bg: 'rgba(156,199,255,0.08)' },
+  info: { label: 'Info', color: '#dde2f1', bg: 'rgba(221,226,241,0.06)' },
+}
+
+function CrawlerEvidencePanel({ auditId }) {
+  return (
+    <EvidencePanel
+      auditId={auditId}
+      field="crawler_evidence"
+      emptyMessage="Crawler evidence was not enabled for this audit."
+    />
+  )
+}
+
+function RenderedSEOPanel({ auditId }) {
+  return (
+    <EvidencePanel
+      auditId={auditId}
+      field="rendered_seo"
+      emptyMessage="Rendered JavaScript SEO checks were not enabled for this audit."
+    />
+  )
+}
+
+function EvidencePanel({ auditId, field, emptyMessage }) {
+  const [items, setItems] = useState(null)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    api.getReportJSON(auditId)
+      .then((report) => {
+        setItems(report?.[field] ?? [])
+        setErr('')
+      })
+      .catch((e) => setErr(e.message || 'Failed to load evidence'))
+  }, [auditId, field])
+
+  if (err) {
+    return (
+      <div className="card p-6 text-sm" style={{ color: '#ffb4ab' }}>
+        {err}
+      </div>
+    )
+  }
+
+  if (!items) {
+    return (
+      <div className="card p-12 flex items-center justify-center">
+        <span className="w-8 h-8 rounded-full animate-spin" style={{ border: '2px solid #2f3540', borderTopColor: '#3fe56c' }} />
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="card p-6 text-on-surface-variant text-sm">
+        {emptyMessage}
+      </div>
+    )
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <div
+        className="grid gap-3 px-4 py-2 text-on-surface-variant uppercase tracking-widest"
+        style={{ gridTemplateColumns: '100px minmax(220px, 1.2fr) 120px minmax(240px, 1fr)', fontSize: '9px', borderBottom: '1px solid rgba(60,74,60,0.24)' }}
+      >
+        <span>ID</span>
+        <span>Check</span>
+        <span>Status</span>
+        <span>Evidence</span>
+      </div>
+      {items.map((item) => {
+        const meta = EVIDENCE_META[item.status] ?? EVIDENCE_META.info
+        return (
+          <div
+            key={item.id}
+            className="grid gap-3 px-4 py-3 items-start"
+            style={{ gridTemplateColumns: '100px minmax(220px, 1.2fr) 120px minmax(240px, 1fr)', borderTop: '1px solid rgba(60,74,60,0.16)' }}
+          >
+            <code className="font-mono text-primary" style={{ fontSize: '11px' }}>{item.id}</code>
+            <div>
+              <div className="text-on-surface text-sm leading-snug">{item.name}</div>
+              {item.details && <div className="text-on-surface-variant mt-1 leading-snug" style={{ fontSize: '11px' }}>{item.details}</div>}
+            </div>
+            <span className="w-fit rounded-full px-2 py-0.5 font-mono" style={{ background: meta.bg, color: meta.color, fontSize: '10px' }}>
+              {meta.label}
+            </span>
+            <div>
+              <div className="text-on-surface" style={{ fontSize: '12px' }}>{item.message}</div>
+              {item.evidence?.length > 0 && (
+                <div className="mt-2 flex flex-col gap-1">
+                  {item.evidence.slice(0, 8).map((line, idx) => (
+                    <code key={`${item.id}-${idx}`} className="text-on-surface-variant break-all" style={{ fontSize: '10px' }}>{line}</code>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

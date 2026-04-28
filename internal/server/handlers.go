@@ -3,10 +3,12 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/cars24/seo-automation/internal/checks"
 	"github.com/cars24/seo-automation/internal/integrations"
+	"github.com/cars24/seo-automation/internal/models"
 )
 
 // Handlers holds references to all service-layer dependencies.
@@ -151,7 +153,21 @@ func (h *Handlers) serveReportHTML(w http.ResponseWriter, r *http.Request, id st
 // ── GET /api/audits/{id}/report.json ─────────────────────────────────────────
 
 func (h *Handlers) serveReportJSON(w http.ResponseWriter, r *http.Request, id string) {
-	http.ServeFile(w, r, h.storage.ReportPath(id, "json"))
+	path := h.storage.ReportPath(id, "json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	var audit models.SiteAudit
+	if err := json.Unmarshal(data, &audit); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(data)
+		return
+	}
+	checks.AttachChecklistMappings(&audit)
+	writeJSON(w, http.StatusOK, audit)
 }
 
 // ── GET /api/settings ────────────────────────────────────────────────────────

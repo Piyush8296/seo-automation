@@ -210,6 +210,7 @@ func runAudit(cmd *cobra.Command, args []string) error {
 	if platform == models.PlatformDesktop || platform == models.PlatformMobile {
 		filterByPlatform(audit, platform)
 	}
+	checks.AttachChecklistMappings(audit)
 
 	// Compute health score and grade (overall + desktop + mobile split)
 	report.ComputeHealthScore(audit)

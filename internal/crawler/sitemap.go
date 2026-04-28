@@ -30,8 +30,8 @@ type xmlURLSet struct {
 
 // xmlSitemapIndex is a sitemap index.
 type xmlSitemapIndex struct {
-	XMLName  xml.Name         `xml:"sitemapindex"`
-	Sitemaps []xmlSitemapLoc  `xml:"sitemap"`
+	XMLName  xml.Name        `xml:"sitemapindex"`
+	Sitemaps []xmlSitemapLoc `xml:"sitemap"`
 }
 
 type xmlSitemapLoc struct {
@@ -40,10 +40,15 @@ type xmlSitemapLoc struct {
 
 // FetchSitemapURLs fetches and parses all URLs from a sitemap (index or urlset).
 func FetchSitemapURLs(ctx context.Context, fetcher *Fetcher, sitemapURL string) ([]SitemapEntry, error) {
-	return fetchSitemap(ctx, fetcher, sitemapURL, 0)
+	return fetchSitemap(ctx, fetcher, sitemapURL, 0, 0)
 }
 
-func fetchSitemap(ctx context.Context, fetcher *Fetcher, sitemapURL string, depth int) ([]SitemapEntry, error) {
+// FetchSitemapURLsLimit fetches sitemap URLs up to limit. A limit <= 0 means no limit.
+func FetchSitemapURLsLimit(ctx context.Context, fetcher *Fetcher, sitemapURL string, limit int) ([]SitemapEntry, error) {
+	return fetchSitemap(ctx, fetcher, sitemapURL, 0, limit)
+}
+
+func fetchSitemap(ctx context.Context, fetcher *Fetcher, sitemapURL string, depth int, limit int) ([]SitemapEntry, error) {
 	if depth > 3 {
 		return nil, nil
 	}
@@ -76,7 +81,14 @@ func fetchSitemap(ctx context.Context, fetcher *Fetcher, sitemapURL string, dept
 			if s.Loc == "" {
 				continue
 			}
-			entries, _ := fetchSitemap(ctx, fetcher, strings.TrimSpace(s.Loc), depth+1)
+			if limit > 0 && len(all) >= limit {
+				break
+			}
+			remaining := 0
+			if limit > 0 {
+				remaining = limit - len(all)
+			}
+			entries, _ := fetchSitemap(ctx, fetcher, strings.TrimSpace(s.Loc), depth+1, remaining)
 			all = append(all, entries...)
 		}
 		return all, nil
@@ -89,6 +101,9 @@ func fetchSitemap(ctx context.Context, fetcher *Fetcher, sitemapURL string, dept
 		for _, u := range urlset.URLs {
 			if u.Loc == "" {
 				continue
+			}
+			if limit > 0 && len(entries) >= limit {
+				break
 			}
 			entry := SitemapEntry{URL: strings.TrimSpace(u.Loc)}
 			if u.LastMod != "" {

@@ -64,6 +64,16 @@ export const api = {
       body: JSON.stringify(req),
     }).then(handleResponse),
 
+  getCrawlerEvidence: () =>
+    fetch(`${BASE}/crawler-evidence`).then(handleResponse),
+
+  runCrawlerEvidence: (req) =>
+    fetch(`${BASE}/crawler-evidence/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    }).then(handleResponse),
+
   getSettings: () =>
     fetch(`${BASE}/settings`).then(handleResponse),
 
