@@ -89,7 +89,7 @@ The dashboard at **http://localhost:8080** lets you:
 ### Audit a site
 
 ```bash
-./seo-audit audit --url https://www.cars24.com
+./seo-audit audit --url <URL>
 ```
 
 Reports are written to `./reports/` — open `report.html` in a browser for the full interactive dashboard.
@@ -158,7 +158,7 @@ The workflow runs daily at 02:00 UTC and can be triggered manually via **Actions
 
 | Parameter | Default | Description |
 |---|---|---|
-| `url` | `https://www.cars24.com` | Site to audit |
+| `url` | `<URL>` | Site to audit |
 | `max_depth` | `3` | Max crawl depth |
 | `max_pages` | `500` | Max pages to crawl |
 | `concurrency` | `5` | Parallel workers |
@@ -174,7 +174,7 @@ Reports are uploaded as workflow artifacts and retained for 10 days.
 Ask Claude naturally — no special syntax needed:
 
 ```
-run seo audit on https://www.cars24.com
+run seo audit on <URL>
 audit https://example.com with max-depth 5 and max-pages 500
 ```
 
