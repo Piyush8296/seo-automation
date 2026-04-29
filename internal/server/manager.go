@@ -19,9 +19,9 @@ const (
 	defaultUserAgent           = "SEOAuditBot/1.0 (+https://github.com/cars24/seo-automation)"
 	defaultMobileUA            = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 	defaultTimeout             = "30s"
-	defaultConcur              = 5
+	defaultConcur              = 10
 	defaultScope               = models.CrawlScopeHost
-	defaultSitemapMode         = models.SitemapModeDiscover
+	defaultSitemapMode         = models.SitemapModeOff
 	defaultMaxRedirects        = 10
 	defaultMaxPageSizeKB int64 = 5 * 1024
 )
@@ -63,43 +63,11 @@ func (m *Manager) UpdateSettings(cfg AppSettings) {
 // StartAudit validates the request, persists an initial record, and launches the
 // crawl goroutine. It returns immediately with the new AuditRecord.
 func (m *Manager) StartAudit(req StartAuditRequest) (*AuditRecord, error) {
-	if strings.TrimSpace(req.URL) == "" {
-		return nil, fmt.Errorf("url is required")
-	}
-
-	// Apply defaults
-	if req.Concurrency <= 0 {
-		req.Concurrency = defaultConcur
-	}
-	if req.MaxDepth == 0 {
-		req.MaxDepth = -1 // unlimited
-	}
-	if req.Timeout == "" {
-		req.Timeout = defaultTimeout
-	}
-	if strings.TrimSpace(req.Scope) == "" {
-		req.Scope = string(defaultScope)
-	}
-	if strings.TrimSpace(req.SitemapMode) == "" {
-		req.SitemapMode = string(defaultSitemapMode)
-	}
-	if strings.TrimSpace(req.UserAgent) == "" {
-		req.UserAgent = defaultUserAgent
-	}
-	if strings.TrimSpace(req.MobileUserAgent) == "" {
-		req.MobileUserAgent = defaultMobileUA
-	}
-	if req.MaxRedirects <= 0 {
-		req.MaxRedirects = defaultMaxRedirects
-	}
-	if req.MaxPageSizeKB <= 0 {
-		req.MaxPageSizeKB = defaultMaxPageSizeKB
-	}
-
-	timeout, err := time.ParseDuration(req.Timeout)
+	req, err := NormalizeStartAuditRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("invalid timeout %q: %w", req.Timeout, err)
+		return nil, err
 	}
+	timeout, _ := time.ParseDuration(req.Timeout)
 
 	id := newID()
 	reportsDir := m.storage.AuditDir(id)
@@ -160,18 +128,9 @@ func (m *Manager) runAudit(ctx context.Context, id string, req StartAuditRequest
 		sitemapMode = defaultSitemapMode
 	}
 	noMobile := platform == models.PlatformDesktop
-	respectRobots := true
-	if req.RespectRobots != nil {
-		respectRobots = *req.RespectRobots
-	}
-	expandNoindex := true
-	if req.ExpandNoindexPages != nil {
-		expandNoindex = *req.ExpandNoindexPages
-	}
-	expandCanonical := true
-	if req.ExpandCanonicalizedPages != nil {
-		expandCanonical = *req.ExpandCanonicalizedPages
-	}
+	respectRobots := boolValue(req.RespectRobots, true)
+	expandNoindex := boolValue(req.ExpandNoindexPages, defaultExpandNoindexPages)
+	expandCanonical := boolValue(req.ExpandCanonicalizedPages, defaultExpandCanonicalizedPages)
 
 	cfg := m.GetSettings()
 
@@ -199,8 +158,8 @@ func (m *Manager) runAudit(ctx context.Context, id string, req StartAuditRequest
 		ExpandCanonicalizedPages: expandCanonical,
 		RenderMode:               "html-only",
 		Platform:                 platform,
-		ValidateExternalLinks:    req.ValidateExternalLinks,
-		DiscoverResources:        req.DiscoverResources,
+		ValidateExternalLinks:    boolValue(req.ValidateExternalLinks, defaultValidateExternalLinks),
+		DiscoverResources:        boolValue(req.DiscoverResources, defaultDiscoverResources),
 		SkipLinkHosts:            cfg.SkipLinkHosts,
 		OnProgress: func(crawled int, currentURL string) {
 			m.hub.Broadcast(id, ProgressEvent{

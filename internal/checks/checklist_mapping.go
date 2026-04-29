@@ -102,14 +102,17 @@ var checklistIDMap = map[string][]string{
 	"eeat.privacy_policy.thin":       {"CONTENT-003"},
 
 	// Headings
-	"headings.h1.duplicate":            {"H1-004"},
-	"headings.h1.empty":                {"H1-001", "H1-014"},
-	"headings.h1.missing":              {"H1-001"},
-	"headings.h1.multiple":             {"H1-002"},
-	"headings.h1.too_long":             {"H1-014"},
-	"headings.h1.too_short":            {"H1-014"},
-	"headings.h2.missing":              {"H1-006"},
-	"headings.hierarchy.skipped_level": {"H1-008"},
+	"headings.h1.duplicate":                  {"H1-004"},
+	"headings.h1.empty":                      {"H1-001", "H1-014"},
+	"headings.h1.missing":                    {"H1-001"},
+	"headings.h1.multiple":                   {"H1-002"},
+	"headings.h1.primary_keyword_missing":    {"H1-003"},
+	"headings.h1.too_long":                   {"H1-014"},
+	"headings.h1.too_short":                  {"H1-014"},
+	"headings.h2.keyword_stuffing":           {"H1-015"},
+	"headings.h2.missing":                    {"H1-006"},
+	"headings.h2.secondary_keywords_missing": {"H1-009"},
+	"headings.hierarchy.skipped_level":       {"H1-008", "H1-007", "H1-011"},
 
 	// HTML Structure
 	"html.doctype_missing":         {"HTML-002"},
@@ -176,10 +179,13 @@ var checklistIDMap = map[string][]string{
 	"i18n.hreflang.url_not_absolute":    {"HREFLANG-005"},
 
 	// Meta Descriptions
-	"meta_desc.duplicate": {"META-002"},
-	"meta_desc.missing":   {"META-001"},
-	"meta_desc.too_long":  {"META-001"},
-	"meta_desc.too_short": {"META-001"},
+	"meta_desc.cta_missing":             {"META-005"},
+	"meta_desc.duplicate":               {"META-002"},
+	"meta_desc.dynamic_placeholder":     {"META-009"},
+	"meta_desc.missing":                 {"META-001"},
+	"meta_desc.primary_keyword_missing": {"META-004"},
+	"meta_desc.too_long":                {"META-001"},
+	"meta_desc.too_short":               {"META-001"},
 
 	// Mobile
 	"mobile.font_size.too_small":    {"MOBILE-004"},
@@ -270,10 +276,25 @@ var checklistIDMap = map[string][]string{
 	"schema.website.searchaction_missing":  {"SCHEMA-007"},
 
 	// Titles
-	"title.duplicate": {"TITLE-002"},
-	"title.missing":   {"TITLE-001"},
-	"title.too_long":  {"TITLE-003"},
-	"title.too_short": {"TITLE-003"},
+	"keyword.density_out_of_range":     {"KW-002"},
+	"keyword.first_100_missing":        {"KW-001"},
+	"keyword.surface_mismatch":         {"KW-009"},
+	"title.blog_keyword_missing":       {"TITLE-020"},
+	"title.brand_missing":              {"TITLE-007"},
+	"title.city_model_missing":         {"TITLE-022"},
+	"title.duplicate":                  {"TITLE-002"},
+	"title.dynamic_placeholder":        {"TITLE-010"},
+	"title.homepage_not_brand_focused": {"TITLE-015"},
+	"title.keyword_not_near_start":     {"TITLE-005"},
+	"title.keyword_stuffing":           {"TITLE-008"},
+	"title.missing":                    {"TITLE-001"},
+	"title.model_missing":              {"TITLE-017"},
+	"title.primary_keyword_missing":    {"TITLE-004"},
+	"title.special_chars":              {"TITLE-013"},
+	"title.too_long":                   {"TITLE-003", "TITLE-006"},
+	"title.too_short":                  {"TITLE-003"},
+	"title.topic_mismatch":             {"TITLE-009"},
+	"title.year_missing":               {"TITLE-019"},
 
 	// URL Structure
 	"url.breadcrumb_mismatch":         {"URL-012"},

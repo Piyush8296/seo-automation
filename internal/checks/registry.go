@@ -18,6 +18,7 @@ import (
 	"github.com/cars24/seo-automation/internal/checks/international"
 	"github.com/cars24/seo-automation/internal/checks/mobile"
 	"github.com/cars24/seo-automation/internal/checks/mobile_desktop"
+	"github.com/cars24/seo-automation/internal/checks/onpage_keywords"
 	"github.com/cars24/seo-automation/internal/checks/pagination"
 	"github.com/cars24/seo-automation/internal/checks/performance"
 	"github.com/cars24/seo-automation/internal/checks/resources"
@@ -52,6 +53,9 @@ func init() {
 		pageChecks = append(pageChecks, c)
 	}
 	for _, c := range content_meta_desc.PageChecks() {
+		pageChecks = append(pageChecks, c)
+	}
+	for _, c := range onpage_keywords.PageChecks() {
 		pageChecks = append(pageChecks, c)
 	}
 	for _, c := range content_body.PageChecks() {

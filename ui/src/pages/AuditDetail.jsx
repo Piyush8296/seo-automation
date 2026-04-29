@@ -56,6 +56,14 @@ export default function AuditDetail() {
     } catch {}
   }
 
+  const handleRerunUncapped = async () => {
+    if (!audit) return
+    try {
+      const record = await api.startAudit({ ...audit.config, max_pages: 0 })
+      navigate(`/audit/${record.id}`)
+    } catch {}
+  }
+
   if (loadErr) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
@@ -91,6 +99,8 @@ export default function AuditDetail() {
   const warnings = finalEvent?.warn_count ?? audit.warn_count
   const notices = finalEvent?.notice_count ?? audit.notice_count
   const pages = finalEvent?.page_count ?? audit.page_count
+  const maxPages = audit.config?.max_pages ?? 0
+  const capReached = maxPages > 0 && pages >= maxPages
 
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
@@ -170,6 +180,7 @@ export default function AuditDetail() {
             { label: 'Started',     value: new Date(audit.created_at).toLocaleString() },
             { label: 'Concurrency', value: audit.config?.concurrency ?? '—' },
             { label: 'Max depth',   value: audit.config?.max_depth === -1 ? 'unlimited' : audit.config?.max_depth },
+            { label: 'Max pages',   value: maxPages === 0 ? 'unlimited' : maxPages.toLocaleString() },
             { label: 'Scope',       value: audit.config?.scope ?? 'host' },
             { label: 'Sitemap',     value: audit.config?.sitemap_mode ?? 'discover' },
           ].map(({ label, value }) => (
@@ -240,6 +251,26 @@ export default function AuditDetail() {
               notices={notices}
               pages={pages}
             />
+
+            {capReached && (
+              <div
+                className="rounded-xl px-4 py-3 flex items-center gap-3"
+                style={{ background: 'rgba(255,183,174,0.08)', border: '1px solid rgba(255,183,174,0.22)' }}
+              >
+                <AlertCircle size={18} style={{ color: '#ffb7ae' }} className="shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-on-surface text-sm font-medium">
+                    Crawl stopped at the configured {maxPages.toLocaleString()} page cap.
+                  </div>
+                  <div className="text-on-surface-variant mt-0.5" style={{ fontSize: '12px' }}>
+                    Increase Max Pages or set it to 0 for unlimited to crawl beyond this sample.
+                  </div>
+                </div>
+                <button onClick={handleRerunUncapped} className="btn-ghost ml-auto shrink-0">
+                  <Play size={13} /> Re-run uncapped
+                </button>
+              </div>
+            )}
 
             <div className="flex flex-col gap-3">
               <div

@@ -36,8 +36,8 @@ type StartAuditRequest struct {
 	ExpandNoindexPages       *bool    `json:"expand_noindex_pages,omitempty"`
 	ExpandCanonicalizedPages *bool    `json:"expand_canonicalized_pages,omitempty"`
 	OutputDir                string   `json:"output_dir"`              // optional — overrides default storage dir
-	ValidateExternalLinks    bool     `json:"validate_external_links"` // opt-in external link validation
-	DiscoverResources        bool     `json:"discover_resources"`      // opt-in CSS/JS/font sub-resource discovery
+	ValidateExternalLinks    *bool    `json:"validate_external_links"` // external link validation toggle
+	DiscoverResources        *bool    `json:"discover_resources"`      // CSS/JS/font sub-resource discovery toggle
 	EnableCrawlerEvidence    *bool    `json:"enable_crawler_evidence,omitempty"`
 	ExpectedInventoryURLs    []string `json:"expected_inventory_urls,omitempty"`
 	ExpectedParameterNames   []string `json:"expected_parameter_names,omitempty"`
