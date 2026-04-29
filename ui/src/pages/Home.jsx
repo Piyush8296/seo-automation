@@ -18,6 +18,7 @@ const TIPS = {
   enable_rendered_seo:    'Runs a small Playwright/Chrome pass against sampled pages and compares raw HTML with the rendered DOM for JavaScript SEO risks.',
   rendered_sample_limit:  'Number of crawled pages to render in the browser pass. Higher values improve coverage but add time.',
   rendered_timeout:       'Maximum browser render time per sampled page.',
+  important_page_urls:    'Priority category, hub, city, or model URLs that should be linked directly from the homepage.',
 }
 
 function Tooltip({ text }) {
@@ -478,6 +479,16 @@ export default function Home() {
                         value={form.expected_inventory_urls}
                         onChange={(e) => set('expected_inventory_urls', e.target.value)}
                         placeholder="One URL per line"
+                        disabled={starting}
+                      />
+                    </div>
+                    <div>
+                      <Label tip={TIPS.important_page_urls}>Important homepage-linked URLs</Label>
+                      <textarea
+                        className="input text-sm min-h-[88px]"
+                        value={form.important_page_urls}
+                        onChange={(e) => set('important_page_urls', e.target.value)}
+                        placeholder="One priority URL per line"
                         disabled={starting}
                       />
                     </div>

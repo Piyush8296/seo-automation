@@ -52,6 +52,7 @@ type CrawlerEvidenceRunRequest struct {
 	SitemapMode            string   `json:"sitemap_mode"`
 	RespectRobots          *bool    `json:"respect_robots,omitempty"`
 	ExpectedInventoryURLs  []string `json:"expected_inventory_urls"`
+	ImportantPageURLs      []string `json:"important_page_urls"`
 	ExpectedParameterNames []string `json:"expected_parameter_names"`
 	AllowedImageCDNHosts   []string `json:"allowed_image_cdn_hosts"`
 	RequiredLiveText       []string `json:"required_live_text"`
@@ -77,6 +78,7 @@ type CrawlerEvidenceConfig struct {
 	SitemapMode            string   `json:"sitemap_mode"`
 	RespectRobots          bool     `json:"respect_robots"`
 	ExpectedInventoryCount int      `json:"expected_inventory_count"`
+	ImportantPageCount     int      `json:"important_page_count"`
 	ExpectedParameterNames []string `json:"expected_parameter_names"`
 	AllowedImageCDNHosts   []string `json:"allowed_image_cdn_hosts"`
 	RequiredLiveText       []string `json:"required_live_text"`
@@ -244,6 +246,7 @@ func (h *Handlers) runCrawlerEvidence(w http.ResponseWriter, r *http.Request) {
 			SitemapMode:            string(sitemapMode),
 			RespectRobots:          respectRobots,
 			ExpectedInventoryCount: len(normalizeURLList(req.ExpectedInventoryURLs)),
+			ImportantPageCount:     len(normalizeEvidenceURLList(req.ImportantPageURLs, req.URL)),
 			ExpectedParameterNames: normalizeTokenList(req.ExpectedParameterNames),
 			AllowedImageCDNHosts:   normalizeHostList(req.AllowedImageCDNHosts),
 			RequiredLiveText:       normalizeTokenList(req.RequiredLiveText),
@@ -257,6 +260,14 @@ func (h *Handlers) runCrawlerEvidence(w http.ResponseWriter, r *http.Request) {
 func crawlerEvidenceChecks() []CrawlerEvidenceCheck {
 	checks := robotsEvidenceChecks()
 	checks = append(checks,
+		CrawlerEvidenceCheck{
+			ID:          "INTLINK-001",
+			Name:        "All important pages linked from homepage",
+			Category:    "On-Page SEO",
+			Priority:    "Critical",
+			CrawlerRole: "Compare supplied important URLs against internal links discovered on the homepage.",
+			Notes:       "Supply priority category, hub, city, or model URLs to verify homepage coverage.",
+		},
 		CrawlerEvidenceCheck{
 			ID:          "SITEMAP-022",
 			Name:        "CDP URLs updated in sitemap on new inventory",
@@ -288,6 +299,7 @@ func crawlerEvidenceChecks() []CrawlerEvidenceCheck {
 func analyzeCrawlerEvidence(audit *models.SiteAudit, robots robotsEvidence, req CrawlerEvidenceRunRequest) []CrawlerEvidenceItem {
 	items := analyzeRobotsEvidence(audit, robots, req)
 	items = append(items,
+		analyzeHomepageImportantLinks(audit, req.ImportantPageURLs),
 		analyzeSitemapInventory(audit, req.ExpectedInventoryURLs),
 		analyzeImageCDN(audit, req.AllowedImageCDNHosts),
 		analyzeLiveContent(audit, req.RequiredLiveText),
@@ -300,6 +312,7 @@ func crawlerEvidenceForAudit(ctx context.Context, audit *models.SiteAudit, req S
 		URL:                    req.URL,
 		SitemapURL:             req.SitemapURL,
 		ExpectedInventoryURLs:  req.ExpectedInventoryURLs,
+		ImportantPageURLs:      req.ImportantPageURLs,
 		ExpectedParameterNames: req.ExpectedParameterNames,
 		AllowedImageCDNHosts:   req.AllowedImageCDNHosts,
 		RequiredLiveText:       req.RequiredLiveText,
@@ -476,6 +489,70 @@ func analyzeSitemapInventory(audit *models.SiteAudit, expected []string) Crawler
 	item.Evidence = firstN(missing, 12)
 	if len(missing) > 12 {
 		item.Details = fmt.Sprintf("%d more missing URLs omitted", len(missing)-12)
+	}
+	return item
+}
+
+func analyzeHomepageImportantLinks(audit *models.SiteAudit, important []string) CrawlerEvidenceItem {
+	baseURL := ""
+	if audit != nil {
+		baseURL = audit.SiteURL
+		if baseURL == "" && audit.CrawlConfig.SeedURL != "" {
+			baseURL = audit.CrawlConfig.SeedURL
+		}
+	}
+	expectedURLs := normalizeEvidenceURLList(important, baseURL)
+	home := homepageForAudit(audit)
+	homepageLinks := homepageInternalLinkSet(home)
+
+	item := CrawlerEvidenceItem{
+		ID:       "INTLINK-001",
+		Name:     "All important pages linked from homepage",
+		Category: "Internal Linking Evidence",
+		Status:   "needs_input",
+		Message:  "Homepage links were captured. Add important page URLs to verify homepage coverage.",
+		Evidence: append(
+			[]string{fmt.Sprintf("homepage internal links discovered: %d", len(homepageLinks))},
+			firstN(sortedKeys(homepageLinks), 8)...,
+		),
+	}
+	if home == nil {
+		item.Status = "warning"
+		item.Message = "Homepage was not crawled, so important homepage links could not be verified."
+		item.Evidence = nil
+		return item
+	}
+	if len(expectedURLs) == 0 {
+		return item
+	}
+
+	missing := []string{}
+	matched := []string{}
+	for _, expectedURL := range expectedURLs {
+		key := crawler.DedupeKey(expectedURL)
+		if homepageLinks[key] {
+			matched = append(matched, expectedURL)
+		} else {
+			missing = append(missing, expectedURL)
+		}
+	}
+
+	if len(missing) == 0 {
+		item.Status = "pass"
+		item.Message = "All supplied important URLs are linked from the homepage."
+		item.Evidence = append([]string{fmt.Sprintf("important URLs checked: %d", len(expectedURLs))}, firstN(matched, 8)...)
+		return item
+	}
+
+	item.Status = "fail"
+	item.Message = "Some supplied important URLs are not linked from the homepage."
+	item.Evidence = appendEvidenceSections(
+		"missing_homepage_links", missing,
+		"matched_homepage_links", matched,
+		"homepage_links_sample", sortedKeys(homepageLinks),
+	)
+	if len(missing) > 8 {
+		item.Details = fmt.Sprintf("%d more missing important URLs omitted", len(missing)-8)
 	}
 	return item
 }
@@ -726,6 +803,29 @@ func normalizeURLList(values []string) []string {
 	return out
 }
 
+func normalizeEvidenceURLList(values []string, base string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if base != "" && !strings.Contains(value, "://") {
+			if normalized, err := crawler.NormalizeURL(value, base); err == nil {
+				value = normalized
+			}
+		}
+		key := crawler.DedupeKey(value)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, value)
+	}
+	return out
+}
+
 func normalizeTokenList(values []string) []string {
 	seen := map[string]bool{}
 	out := []string{}
@@ -801,6 +901,43 @@ func discoveredImageHosts(pages []*models.PageData) []string {
 		}
 	}
 	return sortedKeys(hosts)
+}
+
+func homepageForAudit(audit *models.SiteAudit) *models.PageData {
+	if audit == nil {
+		return nil
+	}
+	for _, page := range audit.Pages {
+		if page != nil && page.Depth == 0 {
+			return page
+		}
+	}
+	seedKey := crawler.DedupeKey(firstNonEmpty(audit.SiteURL, audit.CrawlConfig.SeedURL))
+	if seedKey == "" {
+		return nil
+	}
+	for _, page := range audit.Pages {
+		if page == nil {
+			continue
+		}
+		if crawler.DedupeKey(page.URL) == seedKey || crawler.DedupeKey(page.FinalURL) == seedKey {
+			return page
+		}
+	}
+	return nil
+}
+
+func homepageInternalLinkSet(home *models.PageData) map[string]bool {
+	out := map[string]bool{}
+	if home == nil {
+		return out
+	}
+	for _, link := range home.Links {
+		if link.IsInternal && strings.TrimSpace(link.URL) != "" {
+			out[crawler.DedupeKey(link.URL)] = true
+		}
+	}
+	return out
 }
 
 func appendEvidenceSections(labelA string, a []string, labelB string, b []string, labelC string, c []string) []string {

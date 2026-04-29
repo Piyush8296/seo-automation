@@ -40,6 +40,7 @@ type StartAuditRequest struct {
 	DiscoverResources        *bool    `json:"discover_resources"`      // CSS/JS/font sub-resource discovery toggle
 	EnableCrawlerEvidence    *bool    `json:"enable_crawler_evidence,omitempty"`
 	ExpectedInventoryURLs    []string `json:"expected_inventory_urls,omitempty"`
+	ImportantPageURLs        []string `json:"important_page_urls,omitempty"`
 	ExpectedParameterNames   []string `json:"expected_parameter_names,omitempty"`
 	AllowedImageCDNHosts     []string `json:"allowed_image_cdn_hosts,omitempty"`
 	RequiredLiveText         []string `json:"required_live_text,omitempty"`

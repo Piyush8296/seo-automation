@@ -33,6 +33,13 @@ func TestChecklistIDsForRegistryIDMapsToSelf(t *testing.T) {
 	}
 }
 
+func TestChecklistIDsForRenderedJSLinksMapsToInternalLinkingRows(t *testing.T) {
+	want := []string{"JS-002", "CRAWL-006", "INTLINK-011"}
+	if got := ChecklistIDsFor("JS-002"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("ChecklistIDsFor(JS-002)=%v, want %v", got, want)
+	}
+}
+
 func TestAttachChecklistMappings(t *testing.T) {
 	audit := &models.SiteAudit{
 		Pages: []*models.PageData{

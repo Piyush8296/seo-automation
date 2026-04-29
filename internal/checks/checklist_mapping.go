@@ -152,6 +152,7 @@ var checklistIDMap = map[string][]string{
 	"images.size.too_large":           {"IMG-006", "IMG-007", "SPEED-012"},
 
 	// Internal Linking
+	"JS-002":                          {"JS-002", "CRAWL-006", "INTLINK-011"},
 	"links.anchor.empty":              {"INTLINK-002"},
 	"links.anchor.generic":            {"INTLINK-002"},
 	"links.external.broken_4xx":       {"STATUS-008"},
