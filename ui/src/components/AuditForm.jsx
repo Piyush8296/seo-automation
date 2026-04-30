@@ -1,37 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronUp, Play } from 'lucide-react'
-
-const DEFAULTS = {
-  url: '',
-  scope: 'host',
-  scope_prefix: '',
-  sitemap_url: '',
-  sitemap_mode: 'discover',
-  max_depth: -1,
-  max_pages: 0,
-  concurrency: 10,
-  timeout: '30s',
-  platform: '',
-  user_agent: '',
-  mobile_user_agent: '',
-  respect_robots: true,
-  max_redirects: 10,
-  max_page_size_kb: 5120,
-  max_url_length: 0,
-  max_query_params: 0,
-  max_links_per_page: 0,
-  follow_nofollow_links: false,
-  expand_noindex_pages: true,
-  expand_canonicalized_pages: true,
-  output_dir: '',
-  validate_external_links: true,
-  discover_resources: true,
-}
+import { api } from '../lib/api'
+import { auditDefaultsToForm, auditFormToRequest, optionsOrCurrent } from '../lib/auditDefaults'
 
 export default function AuditForm({ onSubmit, loading }) {
-  const [form, setForm] = useState(DEFAULTS)
+  const [form, setForm] = useState(() => auditDefaultsToForm())
+  const [auditControls, setAuditControls] = useState(null)
   const [advanced, setAdvanced] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.getAuditDefaults()
+      .then((data) => {
+        setAuditControls(data?.controls ?? null)
+        setForm((current) => ({
+          ...auditDefaultsToForm(data?.default_config),
+          url: current.url || data?.default_config?.url || '',
+        }))
+      })
+      .catch(() => {})
+  }, [])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -42,22 +30,18 @@ export default function AuditForm({ onSubmit, loading }) {
     if (!url) { setError('URL is required'); return }
     if (!/^https?:\/\//i.test(url)) { setError('URL must start with http:// or https://'); return }
     try {
-      await onSubmit({
-        ...form,
-        url,
-        max_redirects: Number(form.max_redirects),
-        max_page_size_kb: Number(form.max_page_size_kb),
-        max_url_length: Number(form.max_url_length),
-        max_query_params: Number(form.max_query_params),
-        max_links_per_page: Number(form.max_links_per_page),
-        max_depth:   Number(form.max_depth),
-        max_pages:   Number(form.max_pages),
-        concurrency: Number(form.concurrency),
-      })
+      await onSubmit({ ...auditFormToRequest(form), url })
     } catch (err) {
       setError(err.message)
     }
   }
+
+  const concurrencyControl = auditControls?.concurrency ?? { min: 1, max: 20, step: 1 }
+  const maxPagesControl = auditControls?.max_pages ?? { min: 0, step: 50 }
+  const maxDepthOptions = optionsOrCurrent(auditControls?.max_depth_options, form.max_depth, form.max_depth === -1 ? 'Unlimited' : `${form.max_depth} levels`)
+  const timeoutOptions = optionsOrCurrent(auditControls?.timeout_options, form.timeout, form.timeout)
+  const platformOptions = optionsOrCurrent(auditControls?.platform_options, form.platform, 'Both (bifurcated)')
+  const sitemapModeOptions = optionsOrCurrent(auditControls?.sitemap_mode_options, form.sitemap_mode, form.sitemap_mode)
 
   return (
     <form onSubmit={handleSubmit} className="card p-6 flex flex-col gap-5">
@@ -100,35 +84,52 @@ export default function AuditForm({ onSubmit, loading }) {
               className="input"
               disabled={loading}
             >
-              <option value={-1}>Unlimited</option>
-              <option value={1}>1 (homepage only)</option>
-              <option value={2}>2 levels</option>
-              <option value={3}>3 levels</option>
-              <option value={5}>5 levels</option>
+              {maxDepthOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
 
           <div>
             <label className="label">Max pages</label>
-            <select
+            <input
+              type="number"
+              min={maxPagesControl.min}
+              step={maxPagesControl.step}
               value={form.max_pages}
               onChange={(e) => set('max_pages', e.target.value)}
               className="input"
               disabled={loading}
-            >
-              <option value={0}>Unlimited</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={500}>500</option>
-              <option value={1000}>1,000</option>
-            </select>
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(auditControls?.max_page_presets ?? []).map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => set('max_pages', preset.value)}
+                  className="rounded-md px-2 py-1 text-on-surface-variant hover:text-on-surface transition-colors"
+                  style={{
+                    fontSize: '10px',
+                    background: Number(form.max_pages) === preset.value ? 'rgba(63,229,108,0.12)' : '#1a202a',
+                    border: Number(form.max_pages) === preset.value ? '1px solid rgba(63,229,108,0.35)' : '1px solid rgba(60,74,60,0.28)',
+                    color: Number(form.max_pages) === preset.value ? '#3fe56c' : undefined,
+                  }}
+                  disabled={loading}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-1 text-on-surface-variant" style={{ fontSize: '10px' }}>
+              Use 0 for unlimited.
+            </div>
           </div>
 
           <div>
             <label className="label">Concurrency — {form.concurrency} workers</label>
             <input
               type="range"
-              min={1} max={20} step={1}
+              min={concurrencyControl.min} max={concurrencyControl.max} step={concurrencyControl.step}
               value={form.concurrency}
               onChange={(e) => set('concurrency', e.target.value)}
               className="w-full mt-1"
@@ -136,8 +137,8 @@ export default function AuditForm({ onSubmit, loading }) {
               disabled={loading}
             />
             <div className="flex justify-between text-xs text-on-surface-variant/60 mt-1">
-              <span>1 (gentle)</span>
-              <span>20 (fast)</span>
+              <span>{concurrencyControl.min} (gentle)</span>
+              <span>{concurrencyControl.max} (fast)</span>
             </div>
           </div>
 
@@ -149,10 +150,9 @@ export default function AuditForm({ onSubmit, loading }) {
               className="input"
               disabled={loading}
             >
-              <option value="10s">10 seconds</option>
-              <option value="30s">30 seconds</option>
-              <option value="1m">1 minute</option>
-              <option value="2m">2 minutes</option>
+              {timeoutOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
 
@@ -164,9 +164,9 @@ export default function AuditForm({ onSubmit, loading }) {
               className="input"
               disabled={loading}
             >
-              <option value="">Both (bifurcated)</option>
-              <option value="desktop">Desktop only</option>
-              <option value="mobile">Mobile focus</option>
+              {platformOptions.map((option) => (
+                <option key={option.value || 'all'} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
 
@@ -203,9 +203,9 @@ export default function AuditForm({ onSubmit, loading }) {
               className="input"
               disabled={loading}
             >
-              <option value="discover">Discover only</option>
-              <option value="seed">Seed crawl from sitemap</option>
-              <option value="off">Disable sitemap discovery</option>
+              {sitemapModeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
 

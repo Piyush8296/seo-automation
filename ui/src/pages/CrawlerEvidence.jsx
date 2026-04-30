@@ -100,6 +100,7 @@ export default function CrawlerEvidence() {
     sitemapMode: 'discover',
     respectRobots: true,
     expectedInventory: '',
+    importantPages: '',
     expectedParams: 'sort\nfilter\ncity\nprice',
     cdnHosts: '',
     requiredLiveText: '',
@@ -154,6 +155,7 @@ export default function CrawlerEvidence() {
         sitemap_mode: form.sitemapMode,
         respect_robots: form.respectRobots,
         expected_inventory_urls: splitLines(form.expectedInventory),
+        important_page_urls: splitLines(form.importantPages),
         expected_parameter_names: splitLines(form.expectedParams),
         allowed_image_cdn_hosts: splitLines(form.cdnHosts),
         required_live_text: splitLines(form.requiredLiveText),
@@ -327,7 +329,7 @@ export default function CrawlerEvidence() {
                     <div>
                       <h2 className="text-on-surface font-semibold text-sm">Run Crawler Pack</h2>
                       <p className="text-on-surface-variant mt-1 leading-snug" style={{ fontSize: '12px' }}>
-                        Bounded crawl with robots, sitemap, image, and live-content evidence.
+                        Bounded crawl with robots, sitemap, link, image, and live-content evidence.
                       </p>
                     </div>
                   </div>
@@ -391,6 +393,10 @@ export default function CrawlerEvidence() {
                   <div>
                     <label className="label">Expected Inventory URLs</label>
                     <textarea className="input text-sm min-h-[86px]" value={form.expectedInventory} onChange={(e) => updateForm('expectedInventory', e.target.value)} placeholder="One URL per line" />
+                  </div>
+                  <div>
+                    <label className="label">Important Homepage-Linked URLs</label>
+                    <textarea className="input text-sm min-h-[76px]" value={form.importantPages} onChange={(e) => updateForm('importantPages', e.target.value)} placeholder="One priority URL per line" />
                   </div>
                   <div>
                     <label className="label">Expected Parameters</label>

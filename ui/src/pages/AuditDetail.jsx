@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Activity, ArrowLeft, Play, AlertCircle, Table as TableIcon, FileText, Globe2, Settings, CheckSquare, Database, MapPinned, Search, Code2 } from 'lucide-react'
+import { Activity, ArrowLeft, Play, AlertCircle, Table as TableIcon, FileText, Globe2, Settings, CheckSquare, Database, MapPinned, Search, Code2, Link2 } from 'lucide-react'
 import { useSSE } from '../hooks/useSSE'
 import { api } from '../lib/api'
 import CrawlProgress from '../components/CrawlProgress'
@@ -56,6 +56,14 @@ export default function AuditDetail() {
     } catch {}
   }
 
+  const handleRerunUncapped = async () => {
+    if (!audit) return
+    try {
+      const record = await api.startAudit({ ...audit.config, max_pages: 0 })
+      navigate(`/audit/${record.id}`)
+    } catch {}
+  }
+
   if (loadErr) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
@@ -91,6 +99,8 @@ export default function AuditDetail() {
   const warnings = finalEvent?.warn_count ?? audit.warn_count
   const notices = finalEvent?.notice_count ?? audit.notice_count
   const pages = finalEvent?.page_count ?? audit.page_count
+  const maxPages = audit.config?.max_pages ?? 0
+  const capReached = maxPages > 0 && pages >= maxPages
 
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
@@ -170,6 +180,7 @@ export default function AuditDetail() {
             { label: 'Started',     value: new Date(audit.created_at).toLocaleString() },
             { label: 'Concurrency', value: audit.config?.concurrency ?? '—' },
             { label: 'Max depth',   value: audit.config?.max_depth === -1 ? 'unlimited' : audit.config?.max_depth },
+            { label: 'Max pages',   value: maxPages === 0 ? 'unlimited' : maxPages.toLocaleString() },
             { label: 'Scope',       value: audit.config?.scope ?? 'host' },
             { label: 'Sitemap',     value: audit.config?.sitemap_mode ?? 'discover' },
           ].map(({ label, value }) => (
@@ -241,17 +252,39 @@ export default function AuditDetail() {
               pages={pages}
             />
 
+            {capReached && (
+              <div
+                className="rounded-xl px-4 py-3 flex items-center gap-3"
+                style={{ background: 'rgba(255,183,174,0.08)', border: '1px solid rgba(255,183,174,0.22)' }}
+              >
+                <AlertCircle size={18} style={{ color: '#ffb7ae' }} className="shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-on-surface text-sm font-medium">
+                    Crawl stopped at the configured {maxPages.toLocaleString()} page cap.
+                  </div>
+                  <div className="text-on-surface-variant mt-0.5" style={{ fontSize: '12px' }}>
+                    Increase Max Pages or set it to 0 for unlimited to crawl beyond this sample.
+                  </div>
+                </div>
+                <button onClick={handleRerunUncapped} className="btn-ghost ml-auto shrink-0">
+                  <Play size={13} /> Re-run uncapped
+                </button>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
               <div
                 className="flex items-center gap-1"
                 style={{ borderBottom: '1px solid rgba(60,74,60,0.4)' }}
               >
                 <TabButton active={reportTab === 'table'} onClick={() => setReportTab('table')} icon={TableIcon} label="Issue Table" />
+                <TabButton active={reportTab === 'internal-links'} onClick={() => setReportTab('internal-links')} icon={Link2} label="Internal Links" />
                 <TabButton active={reportTab === 'evidence'} onClick={() => setReportTab('evidence')} icon={Activity} label="Crawler Evidence" />
                 <TabButton active={reportTab === 'rendered'} onClick={() => setReportTab('rendered')} icon={Code2} label="Rendered SEO" />
                 <TabButton active={reportTab === 'html'}  onClick={() => setReportTab('html')}  icon={FileText}  label="HTML Report" />
               </div>
               {reportTab === 'table' && <IssueTable auditId={id} />}
+              {reportTab === 'internal-links' && <InternalLinksPanel auditId={id} />}
               {reportTab === 'evidence' && <CrawlerEvidencePanel auditId={id} />}
               {reportTab === 'rendered' && <RenderedSEOPanel auditId={id} />}
               {reportTab === 'html' && <ReportViewer auditId={id} />}
@@ -273,12 +306,30 @@ const EVIDENCE_META = {
   info: { label: 'Info', color: '#dde2f1', bg: 'rgba(221,226,241,0.06)' },
 }
 
+const INTERNAL_LINK_EVIDENCE_FIELDS = ['crawler_evidence', 'rendered_seo']
+
+function isInternalLinkEvidence(item) {
+  const ids = [item?.id, ...(item?.checklist_ids ?? [])].filter(Boolean)
+  return ids.some((id) => id.startsWith('INTLINK-') || id === 'CRAWL-006')
+}
+
 function CrawlerEvidencePanel({ auditId }) {
   return (
     <EvidencePanel
       auditId={auditId}
       field="crawler_evidence"
       emptyMessage="Crawler evidence was not enabled for this audit."
+    />
+  )
+}
+
+function InternalLinksPanel({ auditId }) {
+  return (
+    <EvidencePanel
+      auditId={auditId}
+      fields={INTERNAL_LINK_EVIDENCE_FIELDS}
+      filter={isInternalLinkEvidence}
+      emptyMessage="Internal-linking evidence was not enabled for this audit."
     />
   )
 }
@@ -293,18 +344,20 @@ function RenderedSEOPanel({ auditId }) {
   )
 }
 
-function EvidencePanel({ auditId, field, emptyMessage }) {
+function EvidencePanel({ auditId, field, fields, filter, emptyMessage }) {
   const [items, setItems] = useState(null)
   const [err, setErr] = useState('')
 
   useEffect(() => {
     api.getReportJSON(auditId)
       .then((report) => {
-        setItems(report?.[field] ?? [])
+        const sourceFields = fields ?? [field]
+        const merged = sourceFields.flatMap((name) => report?.[name] ?? [])
+        setItems(filter ? merged.filter(filter) : merged)
         setErr('')
       })
       .catch((e) => setErr(e.message || 'Failed to load evidence'))
-  }, [auditId, field])
+  }, [auditId, field, fields, filter])
 
   if (err) {
     return (

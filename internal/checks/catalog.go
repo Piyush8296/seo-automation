@@ -173,7 +173,10 @@ var checkDescriptors = []models.CheckDescriptor{
 
 	// ── Meta Descriptions ───────────────────────────────────────────────────
 	{ID: "meta_desc.duplicate", Category: "Meta Descriptions", Description: "Multiple pages share the same meta description, reducing click-through differentiation."},
+	{ID: "meta_desc.cta_missing", Category: "Meta Descriptions", Description: "Transactional page meta description lacks a clear call-to-action phrase."},
+	{ID: "meta_desc.dynamic_placeholder", Category: "Meta Descriptions", Description: "Meta description contains an unpopulated template placeholder such as city/model variables."},
 	{ID: "meta_desc.missing", Category: "Meta Descriptions", Description: "Page has no meta description tag; search engines will auto-generate a snippet."},
+	{ID: "meta_desc.primary_keyword_missing", Category: "Meta Descriptions", Description: "Primary URL/topic terms are missing from the meta description."},
 	{ID: "meta_desc.too_long", Category: "Meta Descriptions", Description: "Meta description exceeds ~160 characters and will likely be truncated in SERPs."},
 	{ID: "meta_desc.too_short", Category: "Meta Descriptions", Description: "Meta description is too short to effectively summarise the page content."},
 
@@ -266,10 +269,28 @@ var checkDescriptors = []models.CheckDescriptor{
 	{ID: "schema.website.searchaction_missing", Category: "Structured Data", Description: "WebSite schema is missing SearchAction for sitelinks searchbox."},
 
 	// ── Titles ──────────────────────────────────────────────────────────────
+	{ID: "headings.h1.primary_keyword_missing", Category: "On-Page Keywords", Description: "Primary URL/topic terms are missing from the H1."},
+	{ID: "headings.h2.keyword_stuffing", Category: "On-Page Keywords", Description: "H2 headings repeat the same keyword excessively."},
+	{ID: "headings.h2.secondary_keywords_missing", Category: "On-Page Keywords", Description: "H2 headings do not reinforce secondary topic terms on substantial pages."},
+	{ID: "keyword.density_out_of_range", Category: "On-Page Keywords", Description: "Primary topic density is below 0.5% or above 2% in visible body copy."},
+	{ID: "keyword.first_100_missing", Category: "On-Page Keywords", Description: "Primary topic is missing from the first 100 visible words."},
+	{ID: "keyword.surface_mismatch", Category: "On-Page Keywords", Description: "Keyword/topic alignment is weak across URL, title, H1, and body."},
 	{ID: "title.duplicate", Category: "Titles", Description: "Multiple pages share the same title tag, reducing uniqueness in search results."},
+	{ID: "title.blog_keyword_missing", Category: "Titles", Description: "Blog/article title does not include the inferred target topic from the URL."},
+	{ID: "title.brand_missing", Category: "Titles", Description: "Title tag does not include the site or brand name."},
+	{ID: "title.city_model_missing", Category: "Titles", Description: "City + car model opportunity is missing from the title tag."},
+	{ID: "title.dynamic_placeholder", Category: "Titles", Description: "Title contains an unpopulated dynamic placeholder such as city/model variables."},
+	{ID: "title.homepage_not_brand_focused", Category: "Titles", Description: "Homepage title is not clearly brand-focused."},
+	{ID: "title.keyword_not_near_start", Category: "Titles", Description: "Primary topic appears late in the title tag."},
+	{ID: "title.keyword_stuffing", Category: "Titles", Description: "Title appears keyword-stuffed with repeated terms."},
 	{ID: "title.missing", Category: "Titles", Description: "Page has no <title> tag, a critical ranking and click-through rate factor."},
+	{ID: "title.model_missing", Category: "Titles", Description: "Car model or brand token from the URL is missing from the title."},
+	{ID: "title.primary_keyword_missing", Category: "Titles", Description: "Primary URL/topic terms are missing from the title."},
+	{ID: "title.special_chars", Category: "Titles", Description: "Title contains special characters that can display poorly in SERPs."},
+	{ID: "title.topic_mismatch", Category: "Titles", Description: "Title topic is not supported by the H1 or visible body copy."},
 	{ID: "title.too_long", Category: "Titles", Description: "Title tag exceeds ~60 characters and will likely be truncated in SERPs."},
 	{ID: "title.too_short", Category: "Titles", Description: "Title tag is too short to effectively describe the page content."},
+	{ID: "title.year_missing", Category: "Titles", Description: "Year signal from the URL is missing from the title."},
 
 	// ── URL Structure ───────────────────────────────────────────────────────
 	{ID: "url.contains_stop_words", Category: "URL Structure", Description: "URL contains common stop words (a, the, and…) that add length without SEO value."},

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -49,10 +50,21 @@ func (h *Handlers) startAudit(w http.ResponseWriter, r *http.Request) {
 
 	record, err := h.manager.StartAudit(req)
 	if err != nil {
+		var validationErr *AuditValidationError
+		if errors.As(err, &validationErr) {
+			writeErr(w, http.StatusBadRequest, validationErr.Message)
+			return
+		}
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusCreated, record)
+}
+
+// ── GET /api/audits/defaults ─────────────────────────────────────────────────
+
+func (h *Handlers) getAuditDefaults(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.manager.GetAuditDefaults())
 }
 
 // ── GET /api/audits ───────────────────────────────────────────────────────────

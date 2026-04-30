@@ -2,27 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play, Settings, Globe2, ChevronDown, ChevronUp, CheckSquare, Database, Info, MapPinned, Search } from 'lucide-react'
 import { api } from '../lib/api'
-
-const DEFAULTS = {
-  url: '',
-  max_depth: -1,
-  max_pages: 0,
-  concurrency: 10,
-  timeout: '30s',
-  platform: '',
-  sitemap_mode: 'off',
-  output_dir: '',
-  validate_external_links: true,
-  discover_resources: true,
-  enable_crawler_evidence: true,
-  enable_rendered_seo: true,
-  rendered_sample_limit: 5,
-  rendered_timeout: '20s',
-  expected_inventory_urls: '',
-  expected_parameter_names: '',
-  allowed_image_cdn_hosts: '',
-  required_live_text: '',
-}
+import { auditDefaultsToForm, auditFormToRequest, optionsOrCurrent } from '../lib/auditDefaults'
 
 const TIPS = {
   url:                    'The root URL to start crawling from. All pages within the same domain will be discovered and audited.',
@@ -38,6 +18,7 @@ const TIPS = {
   enable_rendered_seo:    'Runs a small Playwright/Chrome pass against sampled pages and compares raw HTML with the rendered DOM for JavaScript SEO risks.',
   rendered_sample_limit:  'Number of crawled pages to render in the browser pass. Higher values improve coverage but add time.',
   rendered_timeout:       'Maximum browser render time per sampled page.',
+  important_page_urls:    'Priority category, hub, city, or model URLs that should be linked directly from the homepage.',
 }
 
 function Tooltip({ text }) {
@@ -102,17 +83,11 @@ function Label({ children, tip }) {
   )
 }
 
-function splitLines(value) {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
-
 export default function Home() {
   const [starting, setStarting] = useState(false)
   const [checkCount, setCheckCount] = useState(null)
-  const [form, setForm] = useState(DEFAULTS)
+  const [form, setForm] = useState(() => auditDefaultsToForm())
+  const [auditControls, setAuditControls] = useState(null)
   const [advanced, setAdvanced] = useState(false)
   const [formError, setFormError] = useState('')
   const navigate = useNavigate()
@@ -120,6 +95,18 @@ export default function Home() {
   useEffect(() => {
     api.getCheckCatalog()
       .then((c) => setCheckCount(c?.total ?? null))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    api.getAuditDefaults()
+      .then((data) => {
+        setAuditControls(data?.controls ?? null)
+        setForm((current) => ({
+          ...auditDefaultsToForm(data?.default_config),
+          url: current.url || data?.default_config?.url || '',
+        }))
+      })
       .catch(() => {})
   }, [])
 
@@ -133,23 +120,22 @@ export default function Home() {
     if (!/^https?:\/\//i.test(url)) { setFormError('URL must start with http:// or https://'); return }
     setStarting(true)
     try {
-      const record = await api.startAudit({
-        ...form, url,
-        max_depth: Number(form.max_depth),
-        max_pages: Number(form.max_pages),
-        concurrency: Number(form.concurrency),
-        expected_inventory_urls: splitLines(form.expected_inventory_urls),
-        expected_parameter_names: splitLines(form.expected_parameter_names),
-        allowed_image_cdn_hosts: splitLines(form.allowed_image_cdn_hosts),
-        required_live_text: splitLines(form.required_live_text),
-        rendered_sample_limit: Number(form.rendered_sample_limit),
-      })
+      const record = await api.startAudit({ ...auditFormToRequest(form), url })
       navigate(`/audit/${record.id}`)
     } catch (err) {
       setFormError(err.message)
       setStarting(false)
     }
   }
+
+  const concurrencyControl = auditControls?.concurrency ?? { min: 1, max: 20, step: 1 }
+  const maxPagesControl = auditControls?.max_pages ?? { min: 0, step: 50 }
+  const maxDepthOptions = optionsOrCurrent(auditControls?.max_depth_options, form.max_depth, form.max_depth === -1 ? 'Unlimited' : `${form.max_depth} levels`)
+  const timeoutOptions = optionsOrCurrent(auditControls?.timeout_options, form.timeout, form.timeout)
+  const platformOptions = optionsOrCurrent(auditControls?.platform_options, form.platform, 'Both (bifurcated)')
+  const sitemapModeOptions = optionsOrCurrent(auditControls?.sitemap_mode_options, form.sitemap_mode, form.sitemap_mode)
+  const renderedSampleLimitOptions = optionsOrCurrent(auditControls?.rendered_sample_limit_options, form.rendered_sample_limit, `${form.rendered_sample_limit} pages`)
+  const renderedTimeoutOptions = optionsOrCurrent(auditControls?.rendered_timeout_options, form.rendered_timeout, form.rendered_timeout)
 
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
@@ -277,30 +263,51 @@ export default function Home() {
               <div>
                 <Label tip={TIPS.max_depth}>Crawl Depth</Label>
                 <select value={form.max_depth} onChange={(e) => set('max_depth', e.target.value)} className="input" disabled={starting}>
-                  <option value={-1}>Unlimited</option>
-                  <option value={1}>1 level</option>
-                  <option value={2}>2 levels</option>
-                  <option value={3}>3 levels</option>
-                  <option value={5}>5 levels</option>
+                  {maxDepthOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <Label tip={TIPS.max_pages}>Max Pages</Label>
-                <select value={form.max_pages} onChange={(e) => set('max_pages', e.target.value)} className="input" disabled={starting}>
-                  <option value={0}>Unlimited</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={500}>500</option>
-                  <option value={1000}>1,000</option>
-                </select>
+                <input
+                  type="number"
+                  min={maxPagesControl.min}
+                  step={maxPagesControl.step}
+                  value={form.max_pages}
+                  onChange={(e) => set('max_pages', e.target.value)}
+                  className="input"
+                  disabled={starting}
+                />
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(auditControls?.max_page_presets ?? []).map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => set('max_pages', preset.value)}
+                      className="rounded-md px-2 py-1 text-on-surface-variant hover:text-on-surface transition-colors"
+                      style={{
+                        fontSize: '10px',
+                        background: Number(form.max_pages) === preset.value ? 'rgba(63,229,108,0.12)' : '#1a202a',
+                        border: Number(form.max_pages) === preset.value ? '1px solid rgba(63,229,108,0.35)' : '1px solid rgba(60,74,60,0.28)',
+                        color: Number(form.max_pages) === preset.value ? '#3fe56c' : undefined,
+                      }}
+                      disabled={starting}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-1 text-on-surface-variant" style={{ fontSize: '10px' }}>
+                  Use 0 for unlimited.
+                </div>
               </div>
               <div>
                 <Label tip={TIPS.timeout}>Timeout</Label>
                 <select value={form.timeout} onChange={(e) => set('timeout', e.target.value)} className="input" disabled={starting}>
-                  <option value="10s">10 seconds</option>
-                  <option value="30s">30 seconds</option>
-                  <option value="1m">1 minute</option>
-                  <option value="2m">2 minutes</option>
+                  {timeoutOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -309,7 +316,7 @@ export default function Home() {
               <div>
                 <Label tip={TIPS.concurrency}>Concurrent Workers — {form.concurrency}</Label>
                 <input
-                  type="range" min={1} max={20} step={1}
+                  type="range" min={concurrencyControl.min} max={concurrencyControl.max} step={concurrencyControl.step}
                   value={form.concurrency}
                   onChange={(e) => set('concurrency', e.target.value)}
                   className="w-full mt-1"
@@ -317,15 +324,15 @@ export default function Home() {
                   disabled={starting}
                 />
                 <div className="flex justify-between text-on-surface-variant/50 mt-1" style={{ fontSize: '9px' }}>
-                  <span>1 (gentle)</span><span>20 (fast)</span>
+                  <span>{concurrencyControl.min} (gentle)</span><span>{concurrencyControl.max} (fast)</span>
                 </div>
               </div>
               <div>
                 <Label tip={TIPS.platform}>Platform</Label>
                 <select value={form.platform} onChange={(e) => set('platform', e.target.value)} className="input" disabled={starting}>
-                  <option value="">Both (bifurcated)</option>
-                  <option value="desktop">Desktop only</option>
-                  <option value="mobile">Mobile focus</option>
+                  {platformOptions.map((option) => (
+                    <option key={option.value || 'all'} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -361,9 +368,9 @@ export default function Home() {
                     className="input"
                     disabled={starting}
                   >
-                    <option value="off">Off (fastest)</option>
-                    <option value="discover">Discover for coverage</option>
-                    <option value="seed">Seed crawl from sitemap</option>
+                    {sitemapModeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="flex flex-col gap-3" style={{ borderTop: '1px solid rgba(60,74,60,0.3)', paddingTop: '1rem' }}>
@@ -443,10 +450,9 @@ export default function Home() {
                         className="input"
                         disabled={starting}
                       >
-                        <option value={3}>3 pages</option>
-                        <option value={5}>5 pages</option>
-                        <option value={10}>10 pages</option>
-                        <option value={20}>20 pages</option>
+                        {renderedSampleLimitOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -457,10 +463,9 @@ export default function Home() {
                         className="input"
                         disabled={starting}
                       >
-                        <option value="10s">10 seconds</option>
-                        <option value="20s">20 seconds</option>
-                        <option value="30s">30 seconds</option>
-                        <option value="45s">45 seconds</option>
+                        {renderedTimeoutOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -474,6 +479,16 @@ export default function Home() {
                         value={form.expected_inventory_urls}
                         onChange={(e) => set('expected_inventory_urls', e.target.value)}
                         placeholder="One URL per line"
+                        disabled={starting}
+                      />
+                    </div>
+                    <div>
+                      <Label tip={TIPS.important_page_urls}>Important homepage-linked URLs</Label>
+                      <textarea
+                        className="input text-sm min-h-[88px]"
+                        value={form.important_page_urls}
+                        onChange={(e) => set('important_page_urls', e.target.value)}
+                        placeholder="One priority URL per line"
                         disabled={starting}
                       />
                     </div>

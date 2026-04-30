@@ -9,7 +9,7 @@ import (
 
 func TestCrawlerEvidenceChecksCoverPackItems(t *testing.T) {
 	checks := crawlerEvidenceChecks()
-	if got, want := len(checks), 23; got != want {
+	if got, want := len(checks), 24; got != want {
 		t.Fatalf("crawlerEvidenceChecks() len=%d, want %d", got, want)
 	}
 
@@ -22,7 +22,7 @@ func TestCrawlerEvidenceChecksCoverPackItems(t *testing.T) {
 		"ROBOTS-006", "ROBOTS-007", "ROBOTS-008", "ROBOTS-009", "ROBOTS-010",
 		"ROBOTS-011", "ROBOTS-012", "ROBOTS-013", "ROBOTS-014", "ROBOTS-015",
 		"ROBOTS-016", "ROBOTS-017", "ROBOTS-018", "ROBOTS-019", "ROBOTS-020",
-		"SITEMAP-022", "IMG-013", "INDEX-015",
+		"INTLINK-001", "SITEMAP-022", "IMG-013", "INDEX-015",
 	} {
 		if !seen[id] {
 			t.Fatalf("missing crawler evidence check %s", id)
@@ -51,6 +51,50 @@ func TestAnalyzeSitemapInventoryFailsMissingExpectedURLs(t *testing.T) {
 	}
 	if len(item.Evidence) != 1 || item.Evidence[0] != "https://example.com/cars/c" {
 		t.Fatalf("evidence=%v, want missing c URL", item.Evidence)
+	}
+}
+
+func TestAnalyzeHomepageImportantLinksFindsMissingHomepageLinks(t *testing.T) {
+	audit := &models.SiteAudit{
+		SiteURL: "https://example.com/",
+		Pages: []*models.PageData{
+			{
+				URL:   "https://example.com/",
+				Depth: 0,
+				Links: []models.Link{
+					{URL: "https://example.com/buy-used-cars", IsInternal: true},
+				},
+			},
+		},
+	}
+
+	item := analyzeHomepageImportantLinks(audit, []string{"/buy-used-cars/", "/sell-used-cars/"})
+	if item.Status != "fail" {
+		t.Fatalf("status=%s, want fail", item.Status)
+	}
+	if len(item.Evidence) == 0 || item.Evidence[0] != "missing_homepage_links:" {
+		t.Fatalf("evidence=%v, want missing section", item.Evidence)
+	}
+}
+
+func TestAnalyzeHomepageImportantLinksPassesWhenAllImportantLinksPresent(t *testing.T) {
+	audit := &models.SiteAudit{
+		SiteURL: "https://example.com/",
+		Pages: []*models.PageData{
+			{
+				URL:   "https://example.com/",
+				Depth: 0,
+				Links: []models.Link{
+					{URL: "https://example.com/buy-used-cars/", IsInternal: true},
+					{URL: "https://example.com/sell-used-cars", IsInternal: true},
+				},
+			},
+		},
+	}
+
+	item := analyzeHomepageImportantLinks(audit, []string{"/buy-used-cars", "https://example.com/sell-used-cars/"})
+	if item.Status != "pass" {
+		t.Fatalf("status=%s, want pass; evidence=%v", item.Status, item.Evidence)
 	}
 }
 

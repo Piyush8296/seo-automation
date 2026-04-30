@@ -165,6 +165,10 @@ func (s *Server) Handler() http.Handler {
 		}
 
 		switch {
+		// GET /api/audits/defaults
+		case first == "defaults" && second == "" && r.Method == http.MethodGet:
+			s.h.getAuditDefaults(w, r)
+
 		// GET /api/audits/diff?a=X&b=Y
 		case first == "diff" && second == "" && r.Method == http.MethodGet:
 			s.h.diffAudits(w, r)

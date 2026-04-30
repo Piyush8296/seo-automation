@@ -29,6 +29,7 @@ var serverCmd = &cobra.Command{
 Endpoints:
   POST   /api/audits                    start a new audit
   GET    /api/audits                    list all past audits
+  GET    /api/audits/defaults           get backend-owned audit defaults and UI controls
   GET    /api/audits/{id}               get audit metadata
   DELETE /api/audits/{id}               delete audit + reports
   POST   /api/audits/{id}/cancel        cancel a running audit

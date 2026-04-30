@@ -31,6 +31,9 @@ export const api = {
   diffAudits: (a, b) =>
     fetch(`${BASE}/audits/diff?a=${a}&b=${b}`).then(handleResponse),
 
+  getAuditDefaults: () =>
+    fetch(`${BASE}/audits/defaults`).then(handleResponse),
+
   getCheckCatalog: () =>
     fetch(`${BASE}/checks`).then(handleResponse),
 
